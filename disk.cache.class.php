@@ -18,15 +18,6 @@ spl_autoload_register(function($class){
  */
 class iDB_Cache extends idb_Cache_Core {
     /**
-     * Set to true to enable disk cache
-     *
-     * @since 1.1
-     * @access public
-     * @var boolean
-     */
-    var $use_disk_cache = false;
-
-    /**
      * The directory for the cache
      * Specify a cache dir.
      *
@@ -34,7 +25,7 @@ class iDB_Cache extends idb_Cache_Core {
      * @access public
      * @var boolean
      */
-    var $cache_dir = false;
+    var $cache_dir = __DIR__;
 
     /**
      * Behaves as a contructor

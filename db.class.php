@@ -228,6 +228,14 @@ class idb {
     var $use_cache = false;
 
     /**
+     * Set to disk
+     *
+     * @access public
+     * @var string
+     */
+    var $cache_type = "disk";
+
+    /**
      * Connects to the database server and selects a database
      *
      * PHP5 style constructor for compatibility with PHP5. Does
@@ -329,10 +337,10 @@ class idb {
         if (defined('DB_CACHE') && DB_CACHE)
             $this->use_cache = DB_CACHE;
 
-        if (!$this->use_cache)
-            return;
+        if (defined('DB_CACHE_TYPE'))
+            $this->cache_type = DB_CACHE_TYPE;
 
-        require_once __DIR__ . "/" . $this->use_cache . ".cache.class.php";
+        require_once __DIR__ . "/" . $this->cache_type . ".cache.class.php";
 
         $this->cache = new iDB_Cache($this);
     }
