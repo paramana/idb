@@ -336,13 +336,16 @@ class idb {
     function init_cache() {
         if (defined('DB_CACHE') && DB_CACHE)
             $this->use_cache = DB_CACHE;
+        else
+            $this->use_cache = false;
 
-        if (defined('DB_CACHE_TYPE'))
+        if (defined('DB_CACHE_TYPE')) {
             $this->cache_type = DB_CACHE_TYPE;
 
-        require_once __DIR__ . "/" . $this->cache_type . ".cache.class.php";
+            require_once __DIR__ . "/" . $this->cache_type . ".cache.class.php";
 
-        $this->cache = new iDB_Cache($this);
+            $this->cache = new iDB_Cache($this);
+        }
     }
 
     /**
@@ -714,7 +717,7 @@ This could mean your host's database server is down.</p>
         $this->last_query = $query;
 
         // Use core file cache function
-        if ($this->use_cache && ($cache = $this->cache->get_cache($query))) {
+        if ($this->use_cache && !empty($this->cache) && ($cache = $this->cache->get_cache($query))) {
             // Count how many queries there have been
             $this->num_queries++;
             return $cache;
@@ -765,7 +768,7 @@ This could mean your host's database server is down.</p>
         }
 
         // disk caching of queries
-        if ($this->use_cache)
+        if ($this->use_cache && !empty($this->cache))
             $this->cache->store_cache($query, $is_insert);
 
         return $return_val;
