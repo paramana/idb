@@ -37,22 +37,24 @@ class iDB_Cache extends idb_Cache_Core {
     }
 
     /**
-     * Starts the timer, for debugging purposes.
+     * Sets the cache
      *
-     * @since 1.5.0
+     * @param string $query SQL query.
      *
      * @return mixed Database query results
      */
-    function set($cache_name, $cache_value) {
+    function set($key, $value, $ttl=NULL) {
+        if (empty($cache_name) || empty($cache_value))
+            return false;
 
         // The would be cache file for this query
-        $cache_file = $this->cache_dir . '/' . $cache_name;
+        $cache_file = $this->cache_dir . '/' . $key;
 
         // disk caching of queries
         if (!is_dir($this->cache_dir))
             $this->show_errors ? trigger_error("Could not open cache dir: $this->cache_dir", E_USER_WARNING) : null;
         else
-            error_log($cache_value, 3, $cache_file);
+            error_log($value, 3, $cache_file);
     }
 
     /**
@@ -62,10 +64,12 @@ class iDB_Cache extends idb_Cache_Core {
      *
      * @return mixed Database query results
      */
-    function get($cache_name) {
+    function get($key) {
+        if (empty($cache_name))
+            return null;
 
         // The would be cache file for this query
-        $cache_file = $this->cache_dir . '/' . $cache_name;
+        $cache_file = $this->cache_dir . '/' . $key;
 
         // Try to get previously cached version
         if (file_exists($cache_file)) {

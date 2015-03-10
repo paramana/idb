@@ -106,7 +106,7 @@ abstract class idb_Cache_Core {
      * @param string $query the string result of a query to store
      * @param boolean $is_insert if is an insert or not
      */
-    function store_cache($query, $is_insert) {
+    function store_cache($query, $is_insert, $ttl=NULL) {
         $cache_name = md5($query);
 
         //caching of queries
@@ -119,7 +119,7 @@ abstract class idb_Cache_Core {
                 'return_value' => $this->idb->num_rows,
             );
 
-            $this->set($cache_name, serialize($result_cache));
+            $this->set($cache_name, serialize($result_cache), !$ttl ? $this->cache_timeout : $ttl);
         }
     }
 
