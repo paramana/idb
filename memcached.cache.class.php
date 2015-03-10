@@ -80,11 +80,11 @@ class iDB_Cache extends idb_Cache_Core {
             if($this->memcached->addServer($this->host, $this->port))
                 return self::$connected = true;
             
-            $this->show_errors ? trigger_error("Could not connect to memcache server", E_USER_WARNING) : null
+            $this->show_errors ? trigger_error("Could not connect to memcache server", E_USER_WARNING) : null;
             return false;
         }
 
-        $this->show_errors ? trigger_error("No memcache client exists", E_USER_WARNING) : null
+        $this->show_errors ? trigger_error("No memcache client exists", E_USER_WARNING) : null;
         return false;
     }
 }
