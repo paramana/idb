@@ -44,7 +44,7 @@ class iDB_Cache extends idb_Cache_Core {
      * @return mixed Database query results
      */
     function set($key, $value, $ttl=NULL) {
-        if (empty($cache_name) || empty($cache_value))
+        if (empty($cache_name) || empty($value))
             return false;
 
         // The would be cache file for this query
