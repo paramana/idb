@@ -52,7 +52,7 @@ class iDB_Cache extends idb_Cache_Core {
             return false;
 
         $expiry = !$ttl ? $this->expiry : $ttl;
-        $this->memcache->set($key, $value, $expiry);
+        $this->memcache->set($key, $value, MEMCACHE_COMPRESSED, $expiry);
         return true;
     }
 
