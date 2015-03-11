@@ -56,6 +56,14 @@ class iDB_Cache extends idb_Cache_Core {
             return false;
         }
         
+        try {
+            $value = serialize($value);
+        } 
+        catch (Exception $e) {
+            $this->show_errors ? trigger_error("Failed to serialize cache value: $e" , E_USER_WARNING) : null;
+            return false;
+        }
+
         error_log($value, 3, $cache_file);
         return true;
     }

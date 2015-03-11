@@ -107,7 +107,7 @@ abstract class idb_Cache_Core {
             'return_value' => $this->idb->num_rows,
         );
 
-        $this->set($cache_name, serialize($result_cache), !$ttl ? $this->cache_timeout : $ttl);
+        $this->set($cache_name, $result_cache, !$ttl ? $this->cache_timeout : $ttl);
 
         return true;
     }
