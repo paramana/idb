@@ -14,16 +14,6 @@
  */
 abstract class idb_Cache_Core {
     /**
-     * By wrapping up queries you can ensure that the default
-     * is NOT to cache unless specified
-     *
-     * @since 1.1
-     * @access public
-     * @var boolean
-     */
-    var $cache_queries = false;
-
-    /**
      * Cache expiry
      * Note: this is hours
      *
@@ -62,13 +52,10 @@ abstract class idb_Cache_Core {
         if (DEBUG)
             $this->show_errors = true;
 
-        if (defined('DB_CACHE_QUERIES'))
-            $this->cache_queries = DB_CACHE_QUERIES;
-
         if (defined('DB_CACHE_TIMEOUT'))
             $this->cache_timeout = DB_CACHE_TIMEOUT;
 
-        if (defined('DB_CACHE_INSERTS'))
+        if (defined('DB_CACHE_INSERTS') && DB_CACHE_INSERTS)
             $this->cache_inserts = DB_CACHE_INSERTS;
 
         if (empty($idb))
@@ -107,20 +94,22 @@ abstract class idb_Cache_Core {
      * @param boolean $is_insert if is an insert or not
      */
     function store_cache($query, $is_insert, $ttl=NULL) {
+        if (!$this->cache_inserts && $is_insert)
+            return false;
+
         $cache_name = md5($query);
 
-        //caching of queries
-        if (( $this->cache_queries && !$is_insert ) || ( $this->cache_inserts && $is_insert )) {
-            // Cache all result values
-            $result_cache = array(
-                'col_info' => $this->idb->col_info,
-                'last_result' => $this->idb->last_result,
-                'num_rows' => $this->idb->num_rows,
-                'return_value' => $this->idb->num_rows,
-            );
+        // Cache all result values
+        $result_cache = array(
+            'col_info' => $this->idb->col_info,
+            'last_result' => $this->idb->last_result,
+            'num_rows' => $this->idb->num_rows,
+            'return_value' => $this->idb->num_rows,
+        );
 
-            $this->set($cache_name, serialize($result_cache), !$ttl ? $this->cache_timeout : $ttl);
-        }
+        $this->set($cache_name, serialize($result_cache), !$ttl ? $this->cache_timeout : $ttl);
+
+        return true;
     }
 
     /**

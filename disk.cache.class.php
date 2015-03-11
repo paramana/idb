@@ -51,10 +51,13 @@ class iDB_Cache extends idb_Cache_Core {
         $cache_file = $this->cache_dir . '/' . $key;
 
         // disk caching of queries
-        if (!is_dir($this->cache_dir))
+        if (!is_dir($this->cache_dir)) {
             $this->show_errors ? trigger_error("Could not open cache dir: $this->cache_dir", E_USER_WARNING) : null;
-        else
-            error_log($value, 3, $cache_file);
+            return false;
+        }
+        
+        error_log($value, 3, $cache_file);
+        return true;
     }
 
     /**
