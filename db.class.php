@@ -5,7 +5,7 @@
  * 
  * Version: 1.1
  * Started: 02-02-2010
- * Updated: 06-01-2015
+ * Updated: 12-04-2016
  *
  * Original code from {@link http://php.justinvincent.com Justin Vincent (justin@visunet.ie)}
  * and from wordpress {@link http://wordpress.org/}
@@ -53,7 +53,7 @@ define( 'ARRAY_N', 'ARRAY_N' );
 class idb {
 
     /**
-     * Whether to show SQL/DB errors
+     * Whether to show SQL/DB errors.
      *
      * @since 0.71
      * @access private
@@ -1150,6 +1150,7 @@ This could mean your host's database server is down.</p>
      *
      * @param string $table table name
      * @param array $data Data to insert (in column => value pairs). Both $data columns and $data values should be "raw" (neither should be SQL escaped).
+     * Sending a null value will cause the column to be set to NULL - the corresponding format is ignored in this case.
      * @param array|string $format Optional. An array of formats to be mapped to each of the value in $data. If string, that format will be used for all of the values in $data.
 	 * 	A format is one of '%d', '%f', '%s' (integer, float, string). If omitted, all values in $data will be treated as strings unless otherwise specified in idb::$field_types.
      * @return int|false The number of rows inserted, or false on error.
@@ -1172,6 +1173,7 @@ This could mean your host's database server is down.</p>
      *
      * @param string $table table name
      * @param array $data Data to insert (in column => value pairs). Both $data columns and $data values should be "raw" (neither should be SQL escaped).
+     * Sending a null value will cause the column to be set to NULL - the corresponding format is ignored in this case.
      * @param array|string $format Optional. An array of formats to be mapped to each of the value in $data. If string, that format will be used for all of the values in $data.
 	 * 	A format is one of '%d', '%f', '%s' (integer, float, string). If omitted, all values in $data will be treated as strings unless otherwise specified in idb::$field_types.
      * @return int|false The number of rows affected, or false on error.
@@ -1192,12 +1194,15 @@ This could mean your host's database server is down.</p>
      *
      * @param string $table table name
      * @param array $data Data to insert (in column => value pairs).  Both $data columns and $data values should be "raw" (neither should be SQL escaped).
+     * Sending a null value will cause the column to be set to NULL - the corresponding format is ignored in this case.
      * @param array|string $format Optional. An array of formats to be mapped to each of the value in $data. If string, that format will be used for all of the values in $data.
      *     A format is one of '%d', '%s' (decimal number, string). If omitted, all values in $data will be treated as strings unless otherwise specified in idb::$field_types.
      * @return int|false The number of rows affected, or false on error.
      */
 	function _insert_replace_helper( $table, $data, $format = null, $type = 'INSERT' ) {
-		if ( ! in_array( strtoupper( $type ), array( 'REPLACE', 'INSERT' ) ) ) {
+		$this->insert_id = 0;
+
+        if ( ! in_array( strtoupper( $type ), array( 'REPLACE', 'INSERT' ) ) ) {
             return false;
         }
         
@@ -1208,6 +1213,11 @@ This could mean your host's database server is down.</p>
 
 		$formats = $values = array();
 		foreach ( $data as $value ) {
+            if ( is_null( $value['value'] ) ) {
+                $formats[] = 'NULL';
+                continue;
+            }
+
 			$formats[] = $value['format'];
 			$values[]  = $value['value'];
 		}
@@ -1217,7 +1227,7 @@ This could mean your host's database server is down.</p>
 
 		$sql = "$type INTO `$table` ($fields) VALUES ($formats)";
 
-		$this->insert_id = 0;
+		
 		$this->check_current_query = false;
 		return $this->query( $this->prepare( $sql, $values ) );
     }
@@ -1236,6 +1246,7 @@ This could mean your host's database server is down.</p>
      *
      * @param string $table table name
      * @param array $data Data to update (in column => value pairs). Both $data columns and $data values should be "raw" (neither should be SQL escaped).
+     * Sending a null value will cause the column to be set to NULL - the corresponding format is ignored in this case.
      * @param array $where A named array of WHERE clauses (in column => value pairs). Multiple clauses will be joined with ANDs. Both $where columns and $where values should be "raw".
      * @param array|string $format Optional. An array of formats to be mapped to each of the values in $data. If string, that format will be used for all of the values in $data.
 	 * 	A format is one of '%d', '%f', '%s' (integer, float, string). If omitted, all values in $data will be treated as strings unless otherwise specified in idb::$field_types.
@@ -1258,10 +1269,20 @@ This could mean your host's database server is down.</p>
 
 		$fields = $conditions = $values = array();
 		foreach ( $data as $field => $value ) {
+            if ( is_null( $value['value'] ) ) {
+                $fields[] = "`$field` = NULL";
+                continue;
+            }
+
 			$fields[] = "`$field` = " . $value['format'];
 			$values[] = $value['value'];
 		}
 		foreach ( $where as $field => $value ) {
+            if ( is_null( $value['value'] ) ) {
+                $conditions[] = "`$field` IS NULL";
+                continue;
+            }
+
 			$conditions[] = "`$field` = " . $value['format'];
 			$values[] = $value['value'];
 		}
@@ -1289,6 +1310,7 @@ This could mean your host's database server is down.</p>
      *
      * @param string $table table name
      * @param array $where A named array of WHERE clauses (in column => value pairs). Multiple clauses will be joined with ANDs. Both $where columns and $where values should be "raw".
+     * Sending a null value will create an IS NULL comparison - the corresponding format will be ignored in this case.
      * @param array|string $where_format Optional. An array of formats to be mapped to each of the values in $where. If string, that format will be used for all of the items in $where. A format is one of '%d', '%f', '%s' (integer, float, string). If omitted, all values in $where will be treated as strings unless otherwise specified in idb::$field_types.
      * @return int|false The number of rows updated, or false on error.
      */
@@ -1304,6 +1326,11 @@ This could mean your host's database server is down.</p>
 
 		$conditions = $values = array();
 		foreach ( $where as $field => $value ) {
+            if ( is_null( $value['value'] ) ) {
+                $conditions[] = "`$field` IS NULL";
+                continue;
+            }
+
 			$conditions[] = "`$field` = " . $value['format'];
 			$values[] = $value['value'];
 		}
