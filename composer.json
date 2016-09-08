@@ -1,0 +1,16 @@
+{
+	"name": "paramana/idb",
+	"description": "",
+	"type": "library",
+	"licence": "",
+	"require": {},
+	"autoload": {
+		"classmap": [
+			"cache.class.php",
+			"db.class.php",
+			"disk.cache.class.php",
+			"memcache.cache.class.php",
+			"memcached.cache.class.php"
+		]
+	}
+}
