@@ -55,6 +55,9 @@ class idb {
     /**
      * Whether to show SQL/DB errors.
      *
+     * Default behavior is to show errors if both DEBUG
+     * evaluated to true.
+    *
      * @since 0.71
      * @access private
      * @var bool
@@ -971,9 +974,6 @@ This could mean your host's database server is down.</p>
 </ul>
 <p>If you're unsure what these terms mean you should probably contact your host. If you still need help you can always visit the <a href='https://wordpress.org/support/'>WordPress Support Forums</a>.</p>
 " ), htmlspecialchars( $this->dbhost, ENT_QUOTES ) ), 'db_connect_fail' );
-
-		// Call dead_db() if bail didn't die, because this database is no more. It has ceased to be (at least temporarily).
-		dead_db();
 	}
 
     /**
@@ -2121,62 +2121,74 @@ This could mean your host's database server is down.</p>
      * @return error
      */
     public function check_database_version() {
-        // Make sure the server has MySQL 4.1.2
-        if (version_compare($this->db_version(), '4.1.2', '<'))
+        global $wp_version, $required_mysql_version;
+		// Make sure the server has the required MySQL version
+	if ( version_compare($this->db_version(), $required_mysql_version, '<') )
             return trigger_error("database_version: <strong>ERROR</strong>: App %s requires MySQL 4.1.2 or higher ", E_USER_ERROR);
     }
     
     /**
-	 * The database character collate.
+     * The database character collate.
      *
-	 * @since 3.5.0
+     * @since 3.5.0
      *
-	 * @return string The database character collate.
-	 */
-	public function get_charset_collate() {
-		$charset_collate = '';
+     * @return string The database character collate.
+     */
+    public function get_charset_collate() {
+        $charset_collate = '';
 
-		if ( ! empty( $this->charset ) )
-			$charset_collate = "DEFAULT CHARACTER SET $this->charset";
-		if ( ! empty( $this->collate ) )
-			$charset_collate .= " COLLATE $this->collate";
+        if ( ! empty( $this->charset ) )
+                $charset_collate = "DEFAULT CHARACTER SET $this->charset";
+        if ( ! empty( $this->collate ) )
+                $charset_collate .= " COLLATE $this->collate";
 
-		return $charset_collate;
-	}
+        return $charset_collate;
+    }
 
-	/**
-	 * Determine if a database supports a particular feature.
-	 *
-	 * @since 2.7.0
+    /**
+     * Determine if a database supports a particular feature.
+     *
+     * @since 2.7.0
      * @since 4.1.0 Support was added for the 'utf8mb4' feature.
      * 
-	 * @see idb::db_version()
-	 *
-	 * @param string $db_cap The feature to check for. Accepts 'collation',
-	 *                       'group_concat', 'subqueries', 'set_charset',
-	 *                       or 'utf8mb4'.
-	 * @return bool Whether the database feature is supported, false otherwise.
+     * @see idb::db_version()
+     *
+     * @param string $db_cap The feature to check for. Accepts 'collation',
+     *                       'group_concat', 'subqueries', 'set_charset',
+     *                       or 'utf8mb4'.
+	 * @return int|false Whether the database feature is supported, false otherwise.
      */
-	public function has_cap( $db_cap ) {
+    public function has_cap( $db_cap ) {
         $version = $this->db_version();
 
-		switch ( strtolower( $db_cap ) ) {
+	switch ( strtolower( $db_cap ) ) {
             case 'collation' :    // @since 2.5.0
-			case 'group_concat' : // @since 2.7.0
-			case 'subqueries' :   // @since 2.7.0
-				return version_compare( $version, '4.1', '>=' );
+            case 'group_concat' : // @since 2.7.0
+            case 'subqueries' :   // @since 2.7.0
+		return version_compare( $version, '4.1', '>=' );
             case 'set_charset' :
-				return version_compare( $version, '5.0.7', '>=' );
+		return version_compare( $version, '5.0.7', '>=' );
             case 'utf8mb4' :      // @since 4.1.0
-				if ( version_compare( $version, '5.5.3', '<' ) ) {
-					return false;
-				}
-				if ( $this->use_mysqli ) {
-					return mysqli_get_client_version( $this->dbh ) >= 50503;
-				} else {
-					return mysql_get_client_version( $this->dbh ) >= 50503;
-				}
-        }
+                if ( version_compare( $version, '5.5.3', '<' ) ) {
+                        return false;
+                }
+                if ( $this->use_mysqli ) {
+                        $client_version = mysqli_get_client_info();
+                } else {
+                        $client_version = mysql_get_client_info();
+                }
+
+                /*
+                 * libmysql has supported utf8mb4 since 5.5.3, same as the MySQL server.
+                 * mysqlnd has supported utf8mb4 since 5.0.9.
+                 */
+                if ( false !== strpos( $client_version, 'mysqlnd' ) ) {
+                        $client_version = preg_replace( '/^\D+([\d.]+).*/', '$1', $client_version );
+                        return version_compare( $client_version, '5.0.9', '>=' );
+                } else {
+                        return version_compare( $client_version, '5.5.3', '>=' );
+                }
+	}
 
         return false;
     }
@@ -2205,18 +2217,18 @@ This could mean your host's database server is down.</p>
     }
     
     /**
-	 * The database version number.
-	 *
-	 * @since 2.7.0
-	 *
-	 * @return null|string Null on failure, version number on success.
-	 */
-	public function db_version() {
-		if ( $this->use_mysqli ) {
-			$server_info = mysqli_get_server_info( $this->dbh );
-		} else {
-			$server_info = mysql_get_server_info( $this->dbh );
-		}
-		return preg_replace( '/[^0-9.].*/', '', $server_info );
-	}
+     * Retrieves the MySQL server version.
+     *
+     * @since 2.7.0
+     *
+     * @return null|string Null on failure, version number on success.
+     */
+    public function db_version() {
+        if ( $this->use_mysqli ) {
+                $server_info = mysqli_get_server_info( $this->dbh );
+        } else {
+                $server_info = mysql_get_server_info( $this->dbh );
+        }
+        return preg_replace( '/[^0-9.].*/', '', $server_info );
+    }
 }
