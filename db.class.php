@@ -2121,9 +2121,13 @@ This could mean your host's database server is down.</p>
      * @return error
      */
     public function check_database_version() {
-        global $wp_version, $required_mysql_version;
+		global $required_mysql_version;
+		
+		if (empty($required_mysql_version))
+			return true;
+
 		// Make sure the server has the required MySQL version
-	if ( version_compare($this->db_version(), $required_mysql_version, '<') )
+		if (version_compare($this->db_version(), $required_mysql_version, '<') )
             return trigger_error("database_version: <strong>ERROR</strong>: App %s requires MySQL 4.1.2 or higher ", E_USER_ERROR);
     }
     
