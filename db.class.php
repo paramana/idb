@@ -1,11 +1,10 @@
 <?php
-
 /**
  * iDB Class
  * 
  * Version: 1.1
  * Started: 02-02-2010
- * Updated: 12-04-2016
+ * Updated: 04-11-2017
  *
  * Original code from {@link http://php.justinvincent.com Justin Vincent (justin@visunet.ie)}
  * and from wordpress {@link http://wordpress.org/}
@@ -15,7 +14,7 @@
  * 
  * with some added file caching functionality
  * 
- * from wp commit 980668299c4756c0f7019d2265cc679d895ebabc on 10/02/2015
+ * from wp commit a2693fd8602e3263b5925b9d799ddd577202167d on 31/10/2017
  * 
  * @source https://github.com/giannis/idb
  * 
@@ -59,7 +58,6 @@ class idb {
      * evaluated to true.
     *
      * @since 0.71
-     * @access private
      * @var bool
      */
     var $show_errors = false;
@@ -67,7 +65,6 @@ class idb {
     /**
      * Whether to suppress errors during the DB bootstrapping.
      *
-     * @access private
 	 * @since 2.5.0
      * @var bool
      */
@@ -85,25 +82,22 @@ class idb {
      * Amount of queries made
      *
      * @since 1.2.0
-     * @access private
      * @var int
      */
-    var $num_queries = 0;
+	public $num_queries = 0;
 
     /**
      * Count of rows returned by previous query
      *
 	 * @since 0.71
-     * @access private
      * @var int
      */
-    var $num_rows = 0;
+	public $num_rows = 0;
 
     /**
      * Count of affected rows by previous query
      *
      * @since 0.71
-     * @access private
      * @var int
      */
     var $rows_affected = 0;
@@ -112,16 +106,14 @@ class idb {
      * The ID generated for an AUTO_INCREMENT column by the previous query (usually INSERT).
      *
      * @since 0.71
-     * @access public
      * @var int
      */
-    var $insert_id = 0;
+	public $insert_id = 0;
 
     /**
 	 * Last query made
      *
 	 * @since 0.71
-     * @access private
      * @var array
      */
     var $last_query;
@@ -130,7 +122,6 @@ class idb {
      * Results of the last query made
      *
 	 * @since 0.71
-     * @access private
      * @var array|null
      */
     var $last_result;
@@ -139,7 +130,6 @@ class idb {
 	 * MySQL result, which is either a resource or boolean.
 	 *
 	 * @since 0.71
-	 * @access protected
 	 * @var mixed
 	 */
 	protected $result;
@@ -148,7 +138,6 @@ class idb {
 	 * Cached column info, for sanity checking data before inserting
 	 *
 	 * @since 4.2.0
-	 * @access protected
 	 * @var array
 	 */
 	protected $col_meta = array();
@@ -157,7 +146,6 @@ class idb {
 	 * Calculated character sets on tables
 	 *
 	 * @since 4.2.0
-	 * @access protected
 	 * @var array
 	 */
 	protected $table_charset = array();
@@ -166,16 +154,23 @@ class idb {
 	 * Whether text fields in the current query need to be sanity checked.
 	 *
 	 * @since 4.2.0
-	 * @access protected
 	 * @var bool
 	 */
 	protected $check_current_query = true;
     
 	/**
+	 * Flag to ensure we don't run into recursion problems when checking the collation.
+	 *
+	 * @since 4.2.0
+	 * @see idb::check_safe_collation()
+	 * @var bool
+	 */
+	private $checking_collation = false;
+
+	/**
      * Saved info on the table column
      *
 	 * @since 0.71
-	 * @access protected
      * @var array
      */
 	protected $col_info;
@@ -184,7 +179,6 @@ class idb {
      * Saved queries that were executed
      *
      * @since 1.5.0
-     * @access private
      * @var array
      */
     var $queries;
@@ -193,7 +187,6 @@ class idb {
 	 * The number of times to retry reconnecting before dying.
 	 *
 	 * @since 3.9.0
-	 * @access protected
 	 * @see idb::check_connection()
 	 * @var int
 	 */
@@ -203,7 +196,6 @@ class idb {
 	 * Whether the database queries are ready to start executing.
 	 *
 	 * @since 2.3.2
-	 * @access private
      * @var bool
      */
     var $ready = false;
@@ -214,10 +206,11 @@ class idb {
      * Keys are column names, values are format types: 'ID' => '%d'
      *
      * @since 2.8.0
-     * @see idb:prepare()
-     * @see idb:insert()
-     * @see idb:update()
-     * @access public
+	 * @see wpdb::prepare()
+	 * @see wpdb::insert()
+	 * @see wpdb::update()
+	 * @see wpdb::delete()
+	 * @see wp_set_wpdb_vars()
      * @var array
      */
     public $field_types = array();
@@ -226,7 +219,6 @@ class idb {
      * Database table columns charset
      *
      * @since 2.2.0
-     * @access public
      * @var string
      */
     public $charset;
@@ -235,29 +227,96 @@ class idb {
      * Database table columns collate
      *
      * @since 2.2.0
-     * @access public
      * @var string
      */
-    var $collate;
+	public $collate;
 
     /**
      * Database Username
      *
      * @since 2.9.0
-     * @access private
      * @var string
      */
-    var $dbuser;
+	protected $dbuser;
 
     /**
+	 * Database Password
+	 *
+	 * @since 3.1.0
+	 * @var string
+	 */
+	protected $dbpassword;
+
+	/**
+	 * Database Name
+	 *
+	 * @since 3.1.0
+	 * @var string
+	 */
+	protected $dbname;
+
+	/**
+	 * Database Host
+	 *
+	 * @since 3.1.0
+	 * @var string
+	 */
+	protected $dbhost;
+
+	/**
+	 * Database Handle
+	 *
+	 * @since 0.71
+	 * @var string
+	 */
+	protected $dbh;
+
+	/**
      * A textual description of the last query/get_row/get_var call
      *
-     * @since unknown
-     * @access public
+	 * @since 3.0.0
      * @var string
      */
     public $func_call;
+    
+    /**
+	 * Whether MySQL is used as the database engine.
+	 *
+	 * Set in WPDB::db_connect() to true, by default. This is used when checking
+	 * against the required MySQL version for WordPress. Normally, a replacement
+	 * database drop-in (db.php) will skip these checks, but setting this to true
+	 * will force the checks to occur.
+	 *
+	 * @since 3.3.0
+	 * @var bool
+	 */
+	public $is_mysql = null;
 
+	/**
+	 * A list of incompatible SQL modes.
+	 *
+	 * @since 3.9.0
+	 * @var array
+	 */
+	protected $incompatible_modes = array( 'NO_ZERO_DATE', 'ONLY_FULL_GROUP_BY',
+		'STRICT_TRANS_TABLES', 'STRICT_ALL_TABLES', 'TRADITIONAL' );
+        
+	/**
+	 * Whether to use mysqli over mysql.
+	 *
+	 * @since 3.9.0
+	 * @var bool
+	 */
+	private $use_mysqli = false;
+
+	/**
+	 * Whether we've managed to successfully connect at some point
+	 *
+	 * @since 3.9.0
+	 * @var bool
+	 */
+	private $has_connected = false;
+        
     /**
      * Set to true to enable cache
      *
@@ -275,24 +334,6 @@ class idb {
      */
     var $cache_type = "disk";
     
-	/**
-	 * Whether to use mysqli over mysql.
-	 *
-	 * @since 3.9.0
-	 * @access private
-	 * @var bool
-	 */
-	private $use_mysqli = false;
-
-	/**
-	 * Whether we've managed to successfully connect at some point
-	 *
-	 * @since 3.9.0
-	 * @access private
-	 * @var bool
-	 */
-	private $has_connected = false;
-    
     /**
      * Connects to the database server and selects a database
      *
@@ -302,10 +343,12 @@ class idb {
      *
      * @since 2.0.8
      *
-     * @param string $dbuser MySQL database user
+	 * @global string $wp_version
+	 *
+	 * @param string $dbuser     MySQL database user
      * @param string $dbpassword MySQL database password
-     * @param string $dbname MySQL database name
-     * @param string $dbhost MySQL database host
+	 * @param string $dbname     MySQL database name
+	 * @param string $dbhost     MySQL database host
      */
 	public function __construct( $dbuser, $dbpassword, $dbname, $dbhost ) {
 		register_shutdown_function( array( $this, '__destruct' ) );
@@ -337,14 +380,14 @@ class idb {
      *
      * @see idb::__construct()
      * @since 2.0.8
-     * @return bool true
+	 * @return true
      */
     public function __destruct() {
         return true;
     }
     
     /**
-	 * PHP5 style magic getter, used to lazy-load expensive data.
+	 * Makes private properties readable for backward compatibility.
 	 *
 	 * @since 3.5.0
 	 *
@@ -359,7 +402,7 @@ class idb {
 	}
 
 	/**
-	 * Magic function, for backwards compatibility
+	 * Makes private properties settable for backward compatibility.
 	 *
 	 * @since 3.5.0
 	 *
@@ -367,11 +410,19 @@ class idb {
 	 * @param mixed  $value The value to set
 	 */
 	public function __set( $name, $value ) {
+		$protected_members = array(
+			'col_meta',
+			'table_charset',
+			'check_current_query',
+		);
+		if (  in_array( $name, $protected_members, true ) ) {
+			return;
+		}
 		$this->$name = $value;
 	}
 
 	/**
-	 * Magic function, for backwards compatibility
+	 * Makes private properties check-able for backward compatibility.
 	 *
 	 * @since 3.5.0
 	 *
@@ -384,7 +435,7 @@ class idb {
 	}
 
 	/**
-	 * Magic function, for backwards compatibility
+	 * Makes private properties un-settable for backward compatibility.
 	 *
 	 * @since 3.5.0
 	 *
@@ -395,7 +446,182 @@ class idb {
 	}
 
     /**
-     * Sets the cache
+     * Set $this->charset and $this->collate
+     *
+     * @since 3.1.0
+     */
+    public function init_charset() {
+		$charset = 'utf8';
+		$collate = '';
+
+		if ( defined( 'DB_COLLATE' ) && DB_COLLATE ) {
+			$collate = DB_COLLATE;
+		} 
+		else {
+			$collate = 'utf8_general_ci';
+		}
+        
+		if ( defined( 'DB_CHARSET' ) ) {
+			$charset = DB_CHARSET;
+		}
+        
+		$charset_collate = $this->determine_charset( $charset, $collate );
+
+		$this->charset = $charset_collate['charset'];
+		$this->collate = $charset_collate['collate'];
+	}
+
+	/**
+	 * Determines the best charset and collation to use given a charset and collation.
+	 *
+	 * For example, when able, utf8mb4 should be used instead of utf8.
+	 *
+	 * @since 4.6.0
+	 *
+	 * @param string $charset The character set to check.
+	 * @param string $collate The collation to check.
+	 * @return array The most appropriate character set and collation to use.
+	 */
+	public function determine_charset( $charset, $collate ) {
+		if ( ( $this->use_mysqli && ! ( $this->dbh instanceof mysqli ) ) || empty( $this->dbh ) ) {
+			return compact( 'charset', 'collate' );
+		}
+
+		if ( 'utf8' === $charset && $this->has_cap( 'utf8mb4' ) ) {
+			$charset = 'utf8mb4';
+		}
+
+		if ( 'utf8mb4' === $charset && ! $this->has_cap( 'utf8mb4' ) ) {
+			$charset = 'utf8';
+			$collate = str_replace( 'utf8mb4_', 'utf8_', $collate );
+    }
+
+		if ( 'utf8mb4' === $charset ) {
+			// _general_ is outdated, so we can upgrade it to _unicode_, instead.
+			if ( ! $collate || 'utf8_general_ci' === $collate ) {
+				$collate = 'utf8mb4_unicode_ci';
+			} else {
+				$collate = str_replace( 'utf8_', 'utf8mb4_', $collate );
+			}
+		}
+
+		// _unicode_520_ is a better collation, we should use that when it's available.
+		if ( $this->has_cap( 'utf8mb4_520' ) && 'utf8mb4_unicode_ci' === $collate ) {
+			$collate = 'utf8mb4_unicode_520_ci';
+		}
+
+		return compact( 'charset', 'collate' );
+	}
+
+    /**
+     * Sets the connection's character set.
+     *
+     * @since 3.1.0
+     *
+     * @param resource $dbh     The resource given by mysql_connect
+     * @param string   $charset Optional. The character set. Default null.
+     * @param string   $collate Optional. The collation. Default null.
+     */
+	public function set_charset( $dbh, $charset = null, $collate = null ) {
+		if ( ! isset( $charset ) )
+            $charset = $this->charset;
+		if ( ! isset( $collate ) )
+            $collate = $this->collate;
+		if ( $this->has_cap( 'collation' ) && ! empty( $charset ) ) {
+			$set_charset_succeeded = true;
+
+            if ( $this->use_mysqli ) {
+				if ( function_exists( 'mysqli_set_charset' ) && $this->has_cap( 'set_charset' ) ) {
+					$set_charset_succeeded = mysqli_set_charset( $dbh, $charset );
+				}
+
+				if ( $set_charset_succeeded ) {
+					$query = $this->prepare( 'SET NAMES %s', $charset );
+					if ( ! empty( $collate ) )
+						$query .= $this->prepare( ' COLLATE %s', $collate );
+					mysqli_query( $dbh, $query );
+				}
+			} else {
+                if ( function_exists( 'mysql_set_charset' ) && $this->has_cap( 'set_charset' ) ) {
+					$set_charset_succeeded = mysql_set_charset( $charset, $dbh );
+				}
+				if ( $set_charset_succeeded ) {
+                    $query = $this->prepare( 'SET NAMES %s', $charset );
+                    if ( ! empty( $collate ) )
+                        $query .= $this->prepare( ' COLLATE %s', $collate );
+                    mysql_query( $query, $dbh );
+                }
+            }
+        }
+    }
+	
+	/**
+	 * Change the current SQL mode, and ensure its WordPress compatibility.
+	 *
+	 * If no modes are passed, it will ensure the current MySQL server
+	 * modes are compatible.
+	 *
+	 * @since 3.9.0
+	 *
+	 * @param array $modes Optional. A list of SQL modes to set.
+	 */
+	public function set_sql_mode( $modes = array() ) {
+		if ( empty( $modes ) ) {
+			if ( $this->use_mysqli ) {
+				$res = mysqli_query( $this->dbh, 'SELECT @@SESSION.sql_mode' );
+			} else {
+				$res = mysql_query( 'SELECT @@SESSION.sql_mode', $this->dbh );
+			}
+
+			if ( empty( $res ) ) {
+				return;
+			}
+
+			if ( $this->use_mysqli ) {
+				$modes_array = mysqli_fetch_array( $res );
+				if ( empty( $modes_array[0] ) ) {
+					return;
+				}
+				$modes_str = $modes_array[0];
+			} else {
+				$modes_str = mysql_result( $res, 0 );
+			}
+
+			if ( empty( $modes_str ) ) {
+				return;
+			}
+
+			$modes = explode( ',', $modes_str );
+		}
+
+		$modes = array_change_key_case( $modes, CASE_UPPER );
+
+		/**
+		 * Filters the list of incompatible SQL modes to exclude.
+		 *
+		 * @since 3.9.0
+		 *
+		 * @param array $incompatible_modes An array of incompatible modes.
+		 */
+		$incompatible_modes = (array) apply_filters( 'incompatible_sql_modes', $this->incompatible_modes );
+
+		foreach ( $modes as $i => $mode ) {
+			if ( in_array( $mode, $incompatible_modes ) ) {
+				unset( $modes[ $i ] );
+			}
+		}
+
+		$modes_str = implode( ',', $modes );
+
+		if ( $this->use_mysqli ) {
+			mysqli_query( $this->dbh, "SET SESSION sql_mode='$modes_str'" );
+		} else {
+			mysql_query( "SET SESSION sql_mode='$modes_str'", $this->dbh );
+		}
+	}
+
+     /**
+	 * Iniitialize cache
      *
      * @since 3.1.0
      */
@@ -415,73 +641,6 @@ class idb {
     }
 
     /**
-     * Set $this->charset and $this->collate
-     *
-     * @since 3.1.0
-     */
-    public function init_charset() {
-        if (defined('DB_COLLATE')) {
-            $this->collate = DB_COLLATE;
-        }
-        else {
-            $this->collate = 'utf8_general_ci';
-        }
-        
-		if ( defined( 'DB_CHARSET' ) )
-            $this->charset = DB_CHARSET;
-        
-        if ( ( $this->use_mysqli && ! ( $this->dbh instanceof mysqli ) )
-		  || ( empty( $this->dbh ) || ! ( $this->dbh instanceof mysqli ) ) ) {
-			return;
-		}
-
-		if ( 'utf8' === $this->charset && $this->has_cap( 'utf8mb4' ) ) {
-			$this->charset = 'utf8mb4';
-		}
-
-		if ( 'utf8mb4' === $this->charset && ( ! $this->collate || stripos( $this->collate, 'utf8_' ) === 0 ) ) {
-			$this->collate = 'utf8mb4_unicode_ci';
-		}
-    }
-
-    /**
-     * Sets the connection's character set.
-     *
-     * @since 3.1.0
-     *
-     * @param resource $dbh     The resource given by mysql_connect
-     * @param string   $charset Optional. The character set. Default null.
-     * @param string   $collate Optional. The collation. Default null.
-     */
-	public function set_charset( $dbh, $charset = null, $collate = null ) {
-		if ( ! isset( $charset ) )
-            $charset = $this->charset;
-		if ( ! isset( $collate ) )
-            $collate = $this->collate;
-		if ( $this->has_cap( 'collation' ) && ! empty( $charset ) ) {
-            if ( $this->use_mysqli ) {
-				if ( function_exists( 'mysqli_set_charset' ) && $this->has_cap( 'set_charset' ) ) {
-					mysqli_set_charset( $dbh, $charset );
-				} else {
-					$query = $this->prepare( 'SET NAMES %s', $charset );
-					if ( ! empty( $collate ) )
-						$query .= $this->prepare( ' COLLATE %s', $collate );
-					mysqli_query( $dbh, $query );
-				}
-			} else {
-                if ( function_exists( 'mysql_set_charset' ) && $this->has_cap( 'set_charset' ) ) {
-                    mysql_set_charset( $charset, $dbh );
-                } else {
-                    $query = $this->prepare( 'SET NAMES %s', $charset );
-                    if ( ! empty( $collate ) )
-                        $query .= $this->prepare( ' COLLATE %s', $collate );
-                    mysql_query( $query, $dbh );
-                }
-            }
-        }
-    }
-
-    /**
      * Selects a database using the current database connection.
      *
      * The database name will be changed based on the current database
@@ -489,20 +648,18 @@ class idb {
      *
      * @since 0.71
      *
-     * @param string $db MySQL database name
-     * @param resource $dbh Optional link identifier.
-     * @return null Always null.
+	 * @param string        $db  MySQL database name
+	 * @param resource|null $dbh Optional link identifier.
      */
 	public function select( $db, $dbh = null ) {
 		if ( is_null($dbh) )
             $dbh = $this->dbh;
         
         if ( $this->use_mysqli ) {
-			$success = @mysqli_select_db( $dbh, $db );
+			$success = mysqli_select_db( $dbh, $db );
 		} else {
-			$success = @mysql_select_db( $db, $dbh );
+			$success = mysql_select_db( $db, $dbh );
 		}
-        
 		if ( ! $success ) {
             $this->ready = false;
             $this->bail(sprintf('
@@ -519,26 +676,50 @@ class idb {
     }
 
     /**
+	 * Do not use, deprecated.
+	 *
+	 * Use esc_sql() or wpdb::prepare() instead.
+	 *
+	 * @since 2.8.0
+	 * @deprecated 3.6.0 Use wpdb::prepare()
+	 * @see wpdb::prepare
+	 * @see esc_sql()
+	 *
+	 * @param string $string
+	 * @return string
+	 */
+	function _weak_escape( $string ) {
+		if ( func_num_args() === 1 )
+			trigger_error( sprintf( '%1$s is <strong>deprecated</strong>! Use %3$s instead.', __METHOD__, 'idb::prepare() or esc_sql()' ) );
+			
+		return addslashes( $string );
+	}
+
+	/**
      * Real escape, using mysqli_real_escape_string() or mysql_real_escape_string()
      *
+	 * @see mysqli_real_escape_string()
      * @see mysql_real_escape_string()
-     * @see addslashes()
-     * @since 2.8
-     * @access private
+	 * @since 2.8.0
      *
      * @param  string $string to escape
      * @return string escaped
      */
-    function _real_escape($string) {
+	function _real_escape( $string ) {
         if ( $this->dbh ) {
 			if ( $this->use_mysqli ) {
-				return mysqli_real_escape_string( $this->dbh, $string );
+				$escaped = mysqli_real_escape_string( $this->dbh, $string );
 			} else {
-				return mysql_real_escape_string( $string, $this->dbh );
+				$escaped = mysql_real_escape_string( $string, $this->dbh );
 			}
+		} else {
+			$class = get_class( $this );
+			
+			trigger_error(sprintf( '%s must set a database connection for use with escaping.', $class ), E_USER_ERROR);
+			$escaped = addslashes( $string );
 		}
         
-        return addslashes($string);
+		return $this->add_placeholder_escape( $escaped );
     }
 
     /**
@@ -546,19 +727,19 @@ class idb {
      *
 	 * @uses idb::_real_escape()
 	 * @since  2.8.0
-     * @access private
      *
      * @param  string|array $data
      * @return string|array escaped
      */
-	function _escape( $data ) {
+	public function _escape( $data ) {
 		if ( is_array( $data ) ) {
 			foreach ( $data as $k => $v ) {
-				if ( is_array($v) )
+				if ( is_array( $v ) ) {
 					$data[$k] = $this->_escape( $v );
-                else
+				} else {
 					$data[$k] = $this->_real_escape( $v );
             }
+			}
         } else {
 			$data = $this->_real_escape( $data );
         }
@@ -567,12 +748,44 @@ class idb {
     }
 
     /**
+	 * Do not use, deprecated.
+	 *
+	 * Use esc_sql() or wpdb::prepare() instead.
+	 *
+	 * @since 0.71
+	 * @deprecated 3.6.0 Use wpdb::prepare()
+	 * @see wpdb::prepare()
+	 * @see esc_sql()
+	 *
+	 * @param mixed $data
+	 * @return mixed
+	 */
+	public function escape( $data ) {
+		if ( func_num_args() === 1 )
+			trigger_error( sprintf( '%1$s is <strong>deprecated</strong>! Use %3$s instead.', __METHOD__, 'idb::prepare() or esc_sql()' ) );
+
+		if ( is_array( $data ) ) {
+			foreach ( $data as $k => $v ) {
+				if ( is_array( $v ) )
+					$data[$k] = $this->escape( $v, 'recursive' );
+				else
+					$data[$k] = $this->_weak_escape( $v, 'internal' );
+			}
+		} else {
+			$data = $this->_weak_escape( $data, 'internal' );
+		}
+
+		return $data;
+	}
+
+	/**
      * Escapes content by reference for insertion into the database, for security
      *
-     * @uses idb::_real_escape()
+	 * @uses wpdb::_real_escape()
+	 *
      * @since 2.3.0
+	 *
      * @param string $string to escape
-     * @return void
      */
 	public function escape_by_ref( &$string ) {
 		if ( ! is_float( $string ) )
@@ -582,55 +795,114 @@ class idb {
     /**
      * Prepares a SQL query for safe execution. Uses sprintf()-like syntax.
      *
-     * The following directives can be used in the query format string:
+	 * The following placeholders can be used in the query string:
 	 *   %d (integer)
 	 *   %f (float)
      *   %s (string)
-     *   %% (literal percentage sign - no argument needed)
      *
-	 * All of %d, %f, and %s are to be left unquoted in the query string and they need an argument passed for them.
-     * Literals (%) as parts of the query must be properly written as %%.
+	 * All placeholders MUST be left unquoted in the query string. A corresponding argument MUST be passed for each placeholder.
      *
-	 * This function only supports a small subset of the sprintf syntax; it only supports %d (integer), %f (float), and %s (string).
-     * Does not support sign, padding, alignment, width or precision specifiers.
-     * Does not support argument numbering/swapping.
+	 * For compatibility with old behavior, numbered or formatted string placeholders (eg, %1$s, %5s) will not have quotes
+	 * added by this function, so should be passed with appropriate quotes around them for your usage.
      *
-     * May be called like {@link http://php.net/sprintf sprintf()} or like {@link http://php.net/vsprintf vsprintf()}.
+	 * Literal percentage signs (%) in the query string must be written as %%. Percentage wildcards (for example,
+	 * to use in LIKE syntax) must be passed via a substitution argument containing the complete LIKE string, these
+	 * cannot be inserted directly in the query string. Also see {@see esc_like()}.
      *
-     * Both %d and %s should be left unquoted in the query string.
+	 * Arguments may be passed as individual arguments to the method, or as a single array containing all arguments. A combination
+	 * of the two is not supported.
      *
-     * <code>
-	 * idb::prepare( "SELECT * FROM `table` WHERE `column` = %s AND `field` = %d", 'foo', 1337 )
-	 * idb::prepare( "SELECT DATE_FORMAT(`field`, '%%c') FROM `table` WHERE `column` = %s", 'foo' );
-     * </code>
+	 * Examples:
+	 *     $wpdb->prepare( "SELECT * FROM `table` WHERE `column` = %s AND `field` = %d OR `other_field` LIKE %s", array( 'foo', 1337, '%bar' ) );
+	 *     $wpdb->prepare( "SELECT DATE_FORMAT(`field`, '%%c') FROM `table` WHERE `column` = %s", 'foo' );
      *
-     * @link http://php.net/sprintf Description of syntax.
+	 * @link https://secure.php.net/sprintf Description of syntax.
      * @since 2.3.0
      *
-     * @param string $query Query statement with sprintf()-like placeholders
-     * @param array|mixed $args The array of variables to substitute into the query's placeholders if being called like
-	 * 	{@link http://php.net/vsprintf vsprintf()}, or the first variable to substitute into the query's placeholders if
-	 * 	being called like {@link http://php.net/sprintf sprintf()}.
-     * @param mixed $args,... further variables to substitute into the query's placeholders if being called like
-	 * 	{@link http://php.net/sprintf sprintf()}.
-     * @return null|false|string Sanitized query string, null if there is no query, false if there is an error and string
-	 * 	if there was something to prepare
+	 * @param string      $query    Query statement with sprintf()-like placeholders
+	 * @param array|mixed $args     The array of variables to substitute into the query's placeholders if being called with an array of arguments,
+	 *                              or the first variable to substitute into the query's placeholders if being called with individual arguments.
+	 * @param mixed       $args,... further variables to substitute into the query's placeholders if being called wih individual arguments.
+	 * @return string|void Sanitized query string, if there is a query to prepare.
      */
 	public function prepare( $query, $args ) {
-		if ( is_null( $query ) )
+		if ( is_null( $query ) ) {
             return;
+		}
+
+		// This is not meant to be foolproof -- but it will catch obviously incorrect usage.
+		if ( strpos( $query, '%' ) === false ) {
+			trigger_error( sprintf( 'The query argument of %s must have a placeholder.', 'wpdb::prepare()' ), E_USER_ERROR);
+		}
 
         $args = func_get_args();
 		array_shift( $args );
-        // If args were passed as an array (as in vsprintf), move them up
-		if ( isset( $args[0] ) && is_array($args[0]) )
+
+		// If args were passed as an array (as in vsprintf), move them up.
+		$passed_as_array = false;
+		if ( is_array( $args[0] ) && count( $args ) == 1 ) {
+			$passed_as_array = true;
             $args = $args[0];
-		$query = str_replace( "'%s'", '%s', $query ); // in case someone mistakenly already singlequoted it
-		$query = str_replace( '"%s"', '%s', $query ); // doublequote unquoting
-		$query = preg_replace( '|(?<!%)%f|' , '%F', $query ); // Force floats to be locale unaware
-		$query = preg_replace( '|(?<!%)%s|', "'%s'", $query ); // quote the strings, avoiding escaped strings like %%s
+		}
+
+		foreach ( $args as $arg ) {
+			if ( ! is_scalar( $arg ) && ! is_null( $arg ) ) {
+				trigger_error( sprintf( 'Unsupported value type (%s).', gettype( $arg ) ), E_USER_ERROR);
+			}
+		}
+
+		/*
+		 * Specify the formatting allowed in a placeholder. The following are allowed:
+		 *
+		 * - Sign specifier. eg, $+d
+		 * - Numbered placeholders. eg, %1$s
+		 * - Padding specifier, including custom padding characters. eg, %05s, %'#5s
+		 * - Alignment specifier. eg, %05-s
+		 * - Precision specifier. eg, %.2f
+		 */
+		$allowed_format = '(?:[1-9][0-9]*[$])?[-+0-9]*(?: |0|\'.)?[-+0-9]*(?:\.[0-9]+)?';
+
+		/*
+		 * If a %s placeholder already has quotes around it, removing the existing quotes and re-inserting them
+		 * ensures the quotes are consistent.
+		 *
+		 * For backwards compatibility, this is only applied to %s, and not to placeholders like %1$s, which are frequently
+		 * used in the middle of longer strings, or as table name placeholders.
+		 */
+		$query = str_replace( "'%s'", '%s', $query ); // Strip any existing single quotes.
+		$query = str_replace( '"%s"', '%s', $query ); // Strip any existing double quotes.
+		$query = preg_replace( '/(?<!%)%s/', "'%s'", $query ); // Quote the strings, avoiding escaped strings like %%s.
+
+		$query = preg_replace( "/(?<!%)(%($allowed_format)?f)/" , '%\\2F', $query ); // Force floats to be locale unaware.
+
+		$query = preg_replace( "/%(?:%|$|(?!($allowed_format)?[sdF]))/", '%%\\1', $query ); // Escape any unescaped percents.
+
+		// Count the number of valid placeholders in the query.
+		$placeholders = preg_match_all( "/(^|[^%]|(%%)+)%($allowed_format)?[sdF]/", $query, $matches );
+
+		if ( count( $args ) !== $placeholders ) {
+			if ( 1 === $placeholders && $passed_as_array ) {
+				// If the passed query only expected one argument, but the wrong number of arguments were sent as an array, bail.
+				trigger_error( 'The query only expected one placeholder, but an array of multiple placeholders was sent.', E_USER_ERROR);
+				return;
+			} else {
+				/*
+				 * If we don't have the right number of placeholders, but they were passed as individual arguments,
+				 * or we were expecting multiple arguments in an array, throw a warning.
+				 */
+				trigger_error( 
+					/* translators: 1: number of placeholders, 2: number of arguments passed */
+					sprintf( 'The query does not contain the correct number of placeholders (%1$d) for the number of arguments passed (%2$d).',
+						$placeholders,
+						count( $args ) 
+					), E_USER_ERROR);
+			}
+		}
+
 		array_walk( $args, array( $this, 'escape_by_ref' ) );
-		return @vsprintf( $query, $args );
+		$query = @vsprintf( $query, $args );
+
+		return $this->add_placeholder_escape( $query );
     }
     
     /**
@@ -639,16 +911,17 @@ class idb {
 	 * Use this only before idb::prepare() or esc_sql().  Reversing the order is very bad for security.
 	 *
 	 * Example Prepared Statement:
-	 *  $wild = '%';
-	 *  $find = 'only 43% of planets';
-	 *  $like = $wild . $idb->esc_like( $find ) . $wild;
-	 *  $sql  = $idb->prepare( "SELECT * FROM $idb->posts WHERE post_content LIKE %s", $like );
+	 *
+	 *     $wild = '%';
+	 *     $find = 'only 43% of planets';
+	 *     $like = $wild . $wpdb->esc_like( $find ) . $wild;
+	 *     $sql  = $wpdb->prepare( "SELECT * FROM $wpdb->posts WHERE post_content LIKE %s", $like );
 	 *
 	 * Example Escape Chain:
-	 *  $sql  = esc_sql( $idb->esc_like( $input ) );
+	 *
+	 *     $sql  = esc_sql( $wpdb->esc_like( $input ) );
 	 *
 	 * @since 4.0.0
-	 * @access public
 	 *
 	 * @param string $text The raw text to be escaped. The input typed by the user should have no
 	 *                     extra or deleted slashes.
@@ -666,7 +939,7 @@ class idb {
      * @global array $EZSQL_ERROR Stores error information of query and error string
      *
      * @param string $str The error to display
-     * @return false|null False if the showing of errors is disabled.
+	 * @return false|void False if the showing of errors is disabled.
      */
 	public function print_error( $str = '' ) {
         global $EZSQL_ERROR;
@@ -678,40 +951,35 @@ class idb {
 				$str = mysql_error( $this->dbh );
 			}
 		}
-        
 		$EZSQL_ERROR[] = array( 'query' => $this->last_query, 'error_str' => $str );
 
 		if ( $this->suppress_errors )
             return false;
 
-        if ($caller = $this->get_caller())
-            $error_str = sprintf('Database error %1$s for query %2$s made by %3$s', $str, $this->last_query, $caller);
-        else
-            $error_str = sprintf('Database error %1$s for query %2$s', $str, $this->last_query);
+        if ( $caller = $this->get_caller() ) {
+            /* translators: 1: Database error message, 2: SQL query, 3: Name of the calling function */
+            $error_str = sprintf('Database error %1$s for query %2$s made by %3$s', $str, $this->last_query, $caller );
+        }
+        else {
+            /* translators: 1: Database error message, 2: SQL query */
+            $error_str = sprintf('Database error %1$s for query %2$s', $str, $this->last_query );
+        }
 
-        $log_error = true;
-        if (!function_exists('error_log'))
-            $log_error = false;
+		error_log( $error_str );
 
-        $log_file = @ini_get('error_log');
-        if (!empty($log_file) && ('syslog' != $log_file) && !@is_writable($log_file))
-            $log_error = false;
-
-        if ($log_error)
-            @error_log($error_str, 0);
-
-        // Is error output turned on or not..
-        if (!$this->show_errors)
+		// Are we showing errors?
+		if ( ! $this->show_errors )
             return false;
 
         $str = htmlspecialchars($str, ENT_QUOTES);
         $query = htmlspecialchars($this->last_query, ENT_QUOTES);
 
-        // If there is an error then take note of it
-        print "<div id='error'>
-        <p class='idberror'><strong>Database error:</strong> [$str]<br />
-        <code>$query</code></p>
-        </div>";
+        printf(
+                '<div id="error"><p class="idberror"><strong>%s</strong> [%s]<br /><code>%s</code></p></div>',
+                __( 'Database error:' ),
+                $str,
+                $query
+        );
     }
 
     /**
@@ -771,7 +1039,6 @@ class idb {
      * Kill cached query results.
      *
      * @since 0.71
-     * @return void
      */
     public function flush() {
         $this->last_result = array();
@@ -808,7 +1075,7 @@ class idb {
 	 * @since 3.9.0 $allow_bail parameter added.
 	 *
 	 * @param bool $allow_bail Optional. Allows the function to bail. Default true.
-	 * @return null|bool True with a successful connection, false on failure.
+	 * @return bool True with a successful connection, false on failure.
 	 */
     public function db_connect( $allow_bail = true ) {
         $this->is_mysql = true;
@@ -823,25 +1090,24 @@ class idb {
         if ( $this->use_mysqli ) {
 			$this->dbh = mysqli_init();
 
-			// mysqli_real_connect doesn't support the host param including a port or socket
-			// like mysql_connect does. This duplicates how mysql_connect detects a port and/or socket file.
-			$port = null;
-			$socket = null;
-			$host = $this->dbhost;
-			$port_or_socket = strstr( $host, ':' );
-			if ( ! empty( $port_or_socket ) ) {
-				$host = substr( $host, 0, strpos( $host, ':' ) );
-				$port_or_socket = substr( $port_or_socket, 1 );
-				if ( 0 !== strpos( $port_or_socket, '/' ) ) {
-					$port = intval( $port_or_socket );
-					$maybe_socket = strstr( $port_or_socket, ':' );
-					if ( ! empty( $maybe_socket ) ) {
-						$socket = substr( $maybe_socket, 1 );
+			$host    = $this->dbhost;
+			$port    = null;
+			$socket  = null;
+			$is_ipv6 = false;
+
+			if ( $host_data = $this->parse_db_host( $this->dbhost ) ) {
+				list( $host, $port, $socket, $is_ipv6 ) = $host_data;
 					}
-				} else {
-					$socket = $port_or_socket;
+
+			/*
+			 * If using the `mysqlnd` library, the IPv6 address needs to be
+			 * enclosed in square brackets, whereas it doesn't while using the
+			 * `libmysqlclient` library.
+			 * @see https://bugs.php.net/bug.php?id=67563
+			 */
+			if ( $is_ipv6 && extension_loaded( 'mysqlnd' ) ) {
+				$host = "[$host]";
 				}
-			}
 
 			if ( DEBUG ) {
 				mysqli_real_connect( $this->dbh, $host, $this->dbuser, $this->dbpassword, null, $port, $socket, $client_flags );
@@ -866,12 +1132,12 @@ class idb {
 
 				if ( $attempt_fallback ) {
 					$this->use_mysqli = false;
-					$this->db_connect();
+					return $this->db_connect( $allow_bail );
 				}
 			}
 		} else {
             if ( DEBUG ) {
-                $this->dbh = mysql_connect($this->dbhost, $this->dbuser, $this->dbpassword, $new_link, $client_flags );
+                $this->dbh = mysql_connect( $this->dbhost, $this->dbuser, $this->dbpassword, $new_link, $client_flags );
             } else {
                 $this->dbh = @mysql_connect( $this->dbhost, $this->dbuser, $this->dbpassword, $new_link, $client_flags );
             }
@@ -901,6 +1167,7 @@ This could mean your host's database server is down.</p>
 			$this->set_charset( $this->dbh );
 
 			$this->ready = true;
+			$this->set_sql_mode();
 			$this->select( $this->dbname, $this->dbh );
 
 			return true;
@@ -910,10 +1177,57 @@ This could mean your host's database server is down.</p>
     }
     
     /**
-	 * Check that the connection to the database is still up. If not, try to reconnect.
+	 * Parse the DB_HOST setting to interpret it for mysqli_real_connect.
+	 *
+	 * mysqli_real_connect doesn't support the host param including a port or
+	 * socket like mysql_connect does. This duplicates how mysql_connect detects
+	 * a port and/or socket file.
+	 *
+	 * @since 4.9.0
+	 *
+	 * @param string $host The DB_HOST setting to parse.
+	 * @return array|bool Array containing the host, the port, the socket and whether
+	 *                    it is an IPv6 address, in that order. If $host couldn't be parsed,
+	 *                    returns false.
+	 */
+	public function parse_db_host( $host ) {
+		$port    = null;
+		$socket  = null;
+		$is_ipv6 = false;
+
+		// We need to check for an IPv6 address first.
+		// An IPv6 address will always contain at least two colons.
+		if ( substr_count( $host, ':' ) > 1 ) {
+			$pattern = '#^(?:\[)?(?<host>[0-9a-fA-F:]+)(?:\]:(?<port>[\d]+))?(?:/(?<socket>.+))?#';
+			$is_ipv6 = true;
+		} else {
+			// We seem to be dealing with an IPv4 address.
+			$pattern = '#^(?<host>[^:/]*)(?::(?<port>[\d]+))?(?::(?<socket>.+))?#';
+		}
+
+		$matches = array();
+		$result = preg_match( $pattern, $host, $matches );
+
+		if ( 1 !== $result ) {
+			// Couldn't parse the address, bail.
+			return false;
+		}
+
+		$host = '';
+		foreach ( array( 'host', 'port', 'socket' ) as $component ) {
+			if ( ! empty( $matches[ $component ] ) ) {
+				$$component = $matches[ $component ];
+			}
+		}
+
+		return array( $host, $port, $socket, $is_ipv6 );
+	}
+
+	/**
+	 * Checks that the connection to the database is still up. If not, try to reconnect.
 	 *
 	 * If this function is unable to reconnect, it will forcibly die, or if after the
-	 * the template_redirect hook has been fired, return false instead.
+	 * the {@see 'template_redirect'} hook has been fired, return false instead.
 	 *
 	 * If $allow_bail is false, the lack of database connection will need
 	 * to be handled manually.
@@ -921,15 +1235,15 @@ This could mean your host's database server is down.</p>
 	 * @since 3.9.0
 	 *
 	 * @param bool $allow_bail Optional. Allows the function to bail. Default true.
-	 * @return bool|null True if the connection is up.
+	 * @return bool|void True if the connection is up.
 	 */
 	public function check_connection( $allow_bail = true ) {
 		if ( $this->use_mysqli ) {
-			if ( @mysqli_ping( $this->dbh ) ) {
+			if ( ! empty( $this->dbh ) && mysqli_ping( $this->dbh ) ) {
 				return true;
 			}
 		} else {
-			if ( @mysql_ping( $this->dbh ) ) {
+			if ( ! empty( $this->dbh ) && mysql_ping( $this->dbh ) ) {
 				return true;
 			}
 		}
@@ -974,6 +1288,7 @@ This could mean your host's database server is down.</p>
 </ul>
 <p>If you're unsure what these terms mean you should probably contact your host. If you still need help you can always visit the <a href='https://wordpress.org/support/'>WordPress Support Forums</a>.</p>
 " ), htmlspecialchars( $this->dbhost, ENT_QUOTES ) ), 'db_connect_fail' );
+                die();
 	}
 
     /**
@@ -994,9 +1309,6 @@ This could mean your host's database server is down.</p>
 
         $this->flush();
 
-        // For reg expressions
-        $query = trim($query);
-
         // Log how the function was called
         $this->func_call = "\$db->query(\"$query\")";
         
@@ -1014,8 +1326,7 @@ This could mean your host's database server is down.</p>
 
 		$this->check_current_query = true;
 
-        
-        // Keep track of the last query for debug..
+		// Keep track of the last query for debug.
         $this->last_query = $query;
 
         // Use core file cache function
@@ -1027,13 +1338,23 @@ This could mean your host's database server is down.</p>
 
 		$this->_do_query( $query );
 
-		// MySQL server has gone away, try to reconnect
+		// MySQL server has gone away, try to reconnect.
 		$mysql_errno = 0;
 		if ( ! empty( $this->dbh ) ) {
 			if ( $this->use_mysqli ) {
+				if ( $this->dbh instanceof mysqli ) {
 				$mysql_errno = mysqli_errno( $this->dbh );
 			} else {
-				$mysql_errno = mysql_errno( $this->dbh );
+					// $dbh is defined, but isn't a real connection.
+					// Something has gone horribly wrong, let's try a reconnect.
+					$mysql_errno = 2006;
+				}
+			} else {
+				if ( is_resource( $this->dbh ) ) {
+					$mysql_errno = mysql_errno( $this->dbh );
+					} else {
+						$mysql_errno = 2006;
+				}
 			}
 		}
 
@@ -1046,11 +1367,19 @@ This could mean your host's database server is down.</p>
 			}
 		}
 
-		// If there is an error then take note of it..
+		// If there is an error then take note of it.
 		if ( $this->use_mysqli ) {
+			if ( $this->dbh instanceof mysqli ) {
 			$this->last_error = mysqli_error( $this->dbh );
 		} else {
-			$this->last_error = mysql_error( $this->dbh );
+				$this->last_error = __( 'Unable to retrieve the error message from MySQL' );
+			}
+		} else {
+				if ( is_resource( $this->dbh ) ) {
+				$this->last_error = mysql_error( $this->dbh );
+				} else {
+					$this->last_error = __( 'Unable to retrieve the error message from MySQL' );
+			}
 		}
 
 		if ( $this->last_error ) {
@@ -1085,12 +1414,12 @@ This could mean your host's database server is down.</p>
         } else {
             $num_rows = 0;
 			if ( $this->use_mysqli && $this->result instanceof mysqli_result ) {
-				while ( $row = @mysqli_fetch_object( $this->result ) ) {
+				while ( $row = mysqli_fetch_object( $this->result ) ) {
 					$this->last_result[$num_rows] = $row;
 					$num_rows++;
 				}
 			} elseif ( is_resource( $this->result ) ) {
-				while ( $row = @mysql_fetch_object( $this->result ) ) {
+				while ( $row = mysql_fetch_object( $this->result ) ) {
 					$this->last_result[$num_rows] = $row;
 					$num_rows++;
 				}
@@ -1114,8 +1443,7 @@ This could mean your host's database server is down.</p>
 	 *
 	 * @since 3.9.0
 	 *
-	 * @access private
-	 * @see idb::query()
+	 * @see wpdb::query()
 	 *
 	 * @param string $query The query to run.
 	 */
@@ -1124,10 +1452,10 @@ This could mean your host's database server is down.</p>
 			$this->timer_start();
 		}
 
-		if ( $this->use_mysqli ) {
-			$this->result = @mysqli_query( $this->dbh, $query );
-		} else {
-			$this->result = @mysql_query( $query, $this->dbh );
+		if ( ! empty( $this->dbh ) && $this->use_mysqli ) {
+			$this->result = mysqli_query( $this->dbh, $query );
+		} elseif ( ! empty( $this->dbh ) ) {
+			$this->result = mysql_query( $query, $this->dbh );
 		}
 		$this->num_queries++;
 
@@ -1137,22 +1465,74 @@ This could mean your host's database server is down.</p>
 	}
 
     /**
+	 * Generates and returns a placeholder escape string for use in queries returned by ::prepare().
+	 *
+	 * @since 4.8.3
+	 *
+	 * @return string String to escape placeholders.
+	 */
+	public function placeholder_escape() {
+		static $placeholder;
+
+		if ( ! $placeholder ) {
+			// If ext/hash is not present, compat.php's hash_hmac() does not support sha256.
+			$algo = function_exists( 'hash' ) ? 'sha256' : 'sha1';
+			// Old WP installs may not have AUTH_SALT defined.
+			$salt = defined( 'AUTH_SALT' ) ? AUTH_SALT : rand();
+
+			$placeholder = '{' . hash_hmac( $algo, uniqid( $salt, true ), $salt ) . '}';
+		}
+
+		return $placeholder;
+	}
+
+	/**
+	 * Adds a placeholder escape string, to escape anything that resembles a printf() placeholder.
+	 *
+	 * @since 4.8.3
+	 *
+	 * @param string $query The query to escape.
+	 * @return string The query with the placeholder escape string inserted where necessary.
+	 */
+	public function add_placeholder_escape( $query ) {
+		/*
+		 * To prevent returning anything that even vaguely resembles a placeholder,
+		 * we clobber every % we can find.
+		 */
+		return str_replace( '%', $this->placeholder_escape(), $query );
+	}
+
+	/**
+	 * Removes the placeholder escape strings from a query.
+	 *
+	 * @since 4.8.3
+	 *
+	 * @param string $query The query from which the placeholder will be removed.
+	 * @return string The query with the placeholder removed.
+	 */
+	public function remove_placeholder_escape( $query ) {
+		return str_replace( $this->placeholder_escape(), '%', $query );
+	}
+
+	/**
      * Insert a row into a table.
      *
-     * <code>
-     * idb::insert( 'table', array( 'column' => 'foo', 'field' => 'bar' ) )
-     * idb::insert( 'table', array( 'column' => 'foo', 'field' => 1337 ), array( '%s', '%d' ) )
-     * </code>
+	 *     wpdb::insert( 'table', array( 'column' => 'foo', 'field' => 'bar' ) )
+	 *     wpdb::insert( 'table', array( 'column' => 'foo', 'field' => 1337 ), array( '%s', '%d' ) )
      *
      * @since 2.5.0
-     * @see idb::prepare()
-     * @see idb::$field_types
+	 * @see wpdb::prepare()
+	 * @see wpdb::$field_types
+	 * @see wp_set_wpdb_vars()
      *
-     * @param string $table table name
-     * @param array $data Data to insert (in column => value pairs). Both $data columns and $data values should be "raw" (neither should be SQL escaped).
-     * Sending a null value will cause the column to be set to NULL - the corresponding format is ignored in this case.
-     * @param array|string $format Optional. An array of formats to be mapped to each of the value in $data. If string, that format will be used for all of the values in $data.
-	 * 	A format is one of '%d', '%f', '%s' (integer, float, string). If omitted, all values in $data will be treated as strings unless otherwise specified in idb::$field_types.
+	 * @param string       $table  Table name
+	 * @param array        $data   Data to insert (in column => value pairs).
+	 *                             Both $data columns and $data values should be "raw" (neither should be SQL escaped).
+	 *                             Sending a null value will cause the column to be set to NULL - the corresponding format is ignored in this case.
+	 * @param array|string $format Optional. An array of formats to be mapped to each of the value in $data.
+	 *                             If string, that format will be used for all of the values in $data.
+	 *                             A format is one of '%d', '%f', '%s' (integer, float, string).
+	 *                             If omitted, all values in $data will be treated as strings unless otherwise specified in wpdb::$field_types.
      * @return int|false The number of rows inserted, or false on error.
      */
 	public function insert( $table, $data, $format = null ) {
@@ -1162,20 +1542,22 @@ This could mean your host's database server is down.</p>
     /**
      * Replace a row into a table.
      *
-     * <code>
-     * idb::replace( 'table', array( 'column' => 'foo', 'field' => 'bar' ) )
-     * idb::replace( 'table', array( 'column' => 'foo', 'field' => 1337 ), array( '%s', '%d' ) )
-     * </code>
+	 *     wpdb::replace( 'table', array( 'column' => 'foo', 'field' => 'bar' ) )
+	 *     wpdb::replace( 'table', array( 'column' => 'foo', 'field' => 1337 ), array( '%s', '%d' ) )
      *
      * @since 3.0.0
-     * @see idb::prepare()
-     * @see idb::$field_types
+	 * @see wpdb::prepare()
+	 * @see wpdb::$field_types
+	 * @see wp_set_wpdb_vars()
      *
-     * @param string $table table name
-     * @param array $data Data to insert (in column => value pairs). Both $data columns and $data values should be "raw" (neither should be SQL escaped).
-     * Sending a null value will cause the column to be set to NULL - the corresponding format is ignored in this case.
-     * @param array|string $format Optional. An array of formats to be mapped to each of the value in $data. If string, that format will be used for all of the values in $data.
-	 * 	A format is one of '%d', '%f', '%s' (integer, float, string). If omitted, all values in $data will be treated as strings unless otherwise specified in idb::$field_types.
+	 * @param string       $table  Table name
+	 * @param array        $data   Data to insert (in column => value pairs).
+	 *                             Both $data columns and $data values should be "raw" (neither should be SQL escaped).
+	 *                             Sending a null value will cause the column to be set to NULL - the corresponding format is ignored in this case.
+	 * @param array|string $format Optional. An array of formats to be mapped to each of the value in $data.
+	 *                             If string, that format will be used for all of the values in $data.
+	 *                             A format is one of '%d', '%f', '%s' (integer, float, string).
+	 *                             If omitted, all values in $data will be treated as strings unless otherwise specified in wpdb::$field_types.
      * @return int|false The number of rows affected, or false on error.
      */
 	public function replace( $table, $data, $format = null ) {
@@ -1187,16 +1569,20 @@ This could mean your host's database server is down.</p>
      *
      * Runs an insert or replace query based on $type argument.
      *
-     * @access private
      * @since 3.0.0
-     * @see idb::prepare()
-     * @see idb::$field_types
+	 * @see wpdb::prepare()
+	 * @see wpdb::$field_types
+	 * @see wp_set_wpdb_vars()
      *
-     * @param string $table table name
-     * @param array $data Data to insert (in column => value pairs).  Both $data columns and $data values should be "raw" (neither should be SQL escaped).
-     * Sending a null value will cause the column to be set to NULL - the corresponding format is ignored in this case.
-     * @param array|string $format Optional. An array of formats to be mapped to each of the value in $data. If string, that format will be used for all of the values in $data.
-     *     A format is one of '%d', '%s' (decimal number, string). If omitted, all values in $data will be treated as strings unless otherwise specified in idb::$field_types.
+	 * @param string       $table  Table name
+	 * @param array        $data   Data to insert (in column => value pairs).
+	 *                             Both $data columns and $data values should be "raw" (neither should be SQL escaped).
+	 *                             Sending a null value will cause the column to be set to NULL - the corresponding format is ignored in this case.
+	 * @param array|string $format Optional. An array of formats to be mapped to each of the value in $data.
+	 *                             If string, that format will be used for all of the values in $data.
+	 *                             A format is one of '%d', '%f', '%s' (integer, float, string).
+	 *                             If omitted, all values in $data will be treated as strings unless otherwise specified in wpdb::$field_types.
+	 * @param string $type         Optional. What type of operation is this? INSERT or REPLACE. Defaults to INSERT.
      * @return int|false The number of rows affected, or false on error.
      */
 	function _insert_replace_helper( $table, $data, $format = null, $type = 'INSERT' ) {
@@ -1227,7 +1613,6 @@ This could mean your host's database server is down.</p>
 
 		$sql = "$type INTO `$table` ($fields) VALUES ($formats)";
 
-		
 		$this->check_current_query = false;
 		return $this->query( $this->prepare( $sql, $values ) );
     }
@@ -1235,22 +1620,31 @@ This could mean your host's database server is down.</p>
     /**
      * Update a row in the table
      *
-     * <code>
-     * idb::update( 'table', array( 'column' => 'foo', 'field' => 'bar' ), array( 'ID' => 1 ) )
-     * idb::update( 'table', array( 'column' => 'foo', 'field' => 1337 ), array( 'ID' => 1 ), array( '%s', '%d' ), array( '%d' ) )
-     * </code>
+	 *     wpdb::update( 'table', array( 'column' => 'foo', 'field' => 'bar' ), array( 'ID' => 1 ) )
+	 *     wpdb::update( 'table', array( 'column' => 'foo', 'field' => 1337 ), array( 'ID' => 1 ), array( '%s', '%d' ), array( '%d' ) )
      *
      * @since 2.5.0
-     * @see idb::prepare()
-     * @see idb::$field_types
+	 * @see wpdb::prepare()
+	 * @see wpdb::$field_types
+	 * @see wp_set_wpdb_vars()
      *
-     * @param string $table table name
-     * @param array $data Data to update (in column => value pairs). Both $data columns and $data values should be "raw" (neither should be SQL escaped).
-     * Sending a null value will cause the column to be set to NULL - the corresponding format is ignored in this case.
-     * @param array $where A named array of WHERE clauses (in column => value pairs). Multiple clauses will be joined with ANDs. Both $where columns and $where values should be "raw".
-     * @param array|string $format Optional. An array of formats to be mapped to each of the values in $data. If string, that format will be used for all of the values in $data.
-	 * 	A format is one of '%d', '%f', '%s' (integer, float, string). If omitted, all values in $data will be treated as strings unless otherwise specified in idb::$field_types.
-	 * @param array|string $where_format Optional. An array of formats to be mapped to each of the values in $where. If string, that format will be used for all of the items in $where. A format is one of '%d', '%f', '%s' (integer, float, string). If omitted, all values in $where will be treated as strings.
+	 * @param string       $table        Table name
+	 * @param array        $data         Data to update (in column => value pairs).
+	 *                                   Both $data columns and $data values should be "raw" (neither should be SQL escaped).
+	 *                                   Sending a null value will cause the column to be set to NULL - the corresponding
+	 *                                   format is ignored in this case.
+	 * @param array        $where        A named array of WHERE clauses (in column => value pairs).
+	 *                                   Multiple clauses will be joined with ANDs.
+	 *                                   Both $where columns and $where values should be "raw".
+	 *                                   Sending a null value will create an IS NULL comparison - the corresponding format will be ignored in this case.
+	 * @param array|string $format       Optional. An array of formats to be mapped to each of the values in $data.
+	 *                                   If string, that format will be used for all of the values in $data.
+	 *                                   A format is one of '%d', '%f', '%s' (integer, float, string).
+	 *                                   If omitted, all values in $data will be treated as strings unless otherwise specified in wpdb::$field_types.
+	 * @param array|string $where_format Optional. An array of formats to be mapped to each of the values in $where.
+	 *                                   If string, that format will be used for all of the items in $where.
+	 *                                   A format is one of '%d', '%f', '%s' (integer, float, string).
+	 *                                   If omitted, all values in $where will be treated as strings.
      * @return int|false The number of rows updated, or false on error.
      */
 	public function update( $table, $data, $where, $format = null, $where_format = null ) {
@@ -1299,19 +1693,23 @@ This could mean your host's database server is down.</p>
     /**
      * Delete a row in the table
      *
-     * <code>
-     * idb::delete( 'table', array( 'ID' => 1 ) )
-     * idb::delete( 'table', array( 'ID' => 1 ), array( '%d' ) )
-     * </code>
+	 *     wpdb::delete( 'table', array( 'ID' => 1 ) )
+	 *     wpdb::delete( 'table', array( 'ID' => 1 ), array( '%d' ) )
      *
      * @since 3.4.0
-     * @see idb::prepare()
-     * @see idb::$field_types
+	 * @see wpdb::prepare()
+	 * @see wpdb::$field_types
+	 * @see wp_set_wpdb_vars()
      *
-     * @param string $table table name
-     * @param array $where A named array of WHERE clauses (in column => value pairs). Multiple clauses will be joined with ANDs. Both $where columns and $where values should be "raw".
-     * Sending a null value will create an IS NULL comparison - the corresponding format will be ignored in this case.
-     * @param array|string $where_format Optional. An array of formats to be mapped to each of the values in $where. If string, that format will be used for all of the items in $where. A format is one of '%d', '%f', '%s' (integer, float, string). If omitted, all values in $where will be treated as strings unless otherwise specified in idb::$field_types.
+	 * @param string       $table        Table name
+	 * @param array        $where        A named array of WHERE clauses (in column => value pairs).
+	 *                                   Multiple clauses will be joined with ANDs.
+	 *                                   Both $where columns and $where values should be "raw".
+	 *                                   Sending a null value will create an IS NULL comparison - the corresponding format will be ignored in this case.
+	 * @param array|string $where_format Optional. An array of formats to be mapped to each of the values in $where.
+	 *                                   If string, that format will be used for all of the items in $where.
+	 *                                   A format is one of '%d', '%f', '%s' (integer, float, string).
+	 *                                   If omitted, all values in $where will be treated as strings unless otherwise specified in wpdb::$field_types.
      * @return int|false The number of rows updated, or false on error.
      */
 	public function delete( $table, $where, $where_format = null ) {
@@ -1353,17 +1751,25 @@ This could mean your host's database server is down.</p>
 	 * stripped, then field processing is rejected and the query fails.
 	 *
 	 * @since 4.2.0
-	 * @access protected
 	 *
 	 * @param string $table  Table name.
 	 * @param array  $data   Field/value pair.
 	 * @param mixed  $format Format for each field.
-	 * @return array|bool Returns an array of fields that contain paired values
+	 * @return array|false Returns an array of fields that contain paired values
 	 *                    and formats. Returns false for invalid values.
 	 */
 	protected function process_fields( $table, $data, $format ) {
 		$data = $this->process_field_formats( $data, $format );
+		if ( false === $data ) {
+			return false;
+		}
+
 		$data = $this->process_field_charsets( $data, $table );
+		if ( false === $data ) {
+			return false;
+		}
+
+		$data = $this->process_field_lengths( $data, $table );
 		if ( false === $data ) {
 			return false;
 		}
@@ -1381,7 +1787,6 @@ This could mean your host's database server is down.</p>
 	 * Prepares arrays of value/format pairs as passed to idb CRUD methods.
 	 *
 	 * @since 4.2.0
-	 * @access protected
 	 *
 	 * @param array $data   Array of fields to values.
 	 * @param mixed $format Formats to be mapped to the values in $data.
@@ -1417,26 +1822,55 @@ This could mean your host's database server is down.</p>
 	 * the {@see idb::process_field_formats()} method.
 	 *
 	 * @since 4.2.0
-	 * @access protected
 	 *
 	 * @param array  $data  As it comes from the {@see idb::process_field_formats()} method.
 	 * @param string $table Table name.
-	 * @return The same array as $data with additional 'charset' keys.
+	 * @return array|false The same array as $data with additional 'charset' keys.
 	 */
 	protected function process_field_charsets( $data, $table ) {
 		foreach ( $data as $field => $value ) {
 			if ( '%d' === $value['format'] || '%f' === $value['format'] ) {
-				// We can skip this field if we know it isn't a string.
-				// This checks %d/%f versus ! %s because it's sprintf() could take more.
-				$value['charset'] = false;
-			} elseif ( $this->check_ascii( $value['value'] ) ) {
-				// If it's ASCII, then we don't need the charset. We can skip this field.
+				/*
+				 * We can skip this field if we know it isn't a string.
+				 * This checks %d/%f versus ! %s because its sprintf() could take more.
+				 */
 				$value['charset'] = false;
 			} else {
 				$value['charset'] = $this->get_col_charset( $table, $field );
+				if ( !$value['charset'] ) {
+					return false;
+				}
+			}
 				
-				// This isn't ASCII. Don't have strip_invalid_text() re-check.
-				$value['ascii'] = false;
+			$data[ $field ] = $value;
+		}
+
+		return $data;
+	}
+
+	/**
+	 * For string fields, record the maximum string length that field can safely save.
+	 *
+	 * @since 4.2.1
+	 *
+	 * @param array  $data  As it comes from the wpdb::process_field_charsets() method.
+	 * @param string $table Table name.
+	 * @return array|false The same array as $data with additional 'length' keys, or false if
+	 *                     any of the values were too long for their corresponding field.
+	 */
+	protected function process_field_lengths( $data, $table ) {
+		foreach ( $data as $field => $value ) {
+			if ( '%d' === $value['format'] || '%f' === $value['format'] ) {
+				/*
+				 * We can skip this field if we know it isn't a string.
+				 * This checks %d/%f versus ! %s because its sprintf() could take more.
+				 */
+				$value['length'] = false;
+			} else {
+				$value['length'] = $this->get_col_length( $table, $field );
+				if ( !$value['length'] ) {
+					return false;
+				}
 			}
 
 			$data[ $field ] = $value;
@@ -1455,13 +1889,17 @@ This could mean your host's database server is down.</p>
      * @since 0.71
      *
      * @param string|null $query Optional. SQL query. Defaults to null, use the result from the previous query.
-	 * @param int $x Optional. Column of value to return. Indexed from 0.
-	 * @param int $y Optional. Row of value to return. Indexed from 0.
+	 * @param int         $x     Optional. Column of value to return. Indexed from 0.
+	 * @param int         $y     Optional. Row of value to return. Indexed from 0.
      * @return string|null Database query result (as string), or null on failure
      */
 	public function get_var( $query = null, $x = 0, $y = 0 ) {
         $this->func_call = "\$db->get_var(\"$query\", $x, $y)";
 		
+		if ( $this->check_current_query && $this->check_safe_collation( $query ) ) {
+			$this->check_current_query = false;
+		}
+
         if ( $query ) {
 			$this->query( $query );
         }
@@ -1482,14 +1920,19 @@ This could mean your host's database server is down.</p>
      *
      * @since 0.71
      *
-     * @param string|null $query SQL query.
-     * @param string $output Optional. one of ARRAY_A | ARRAY_N | OBJECT constants. Return an associative array (column => value, ...),
-	 * 	a numerically indexed array (0 => value, ...) or an object ( ->column = value ), respectively.
-     * @param int $y Optional. Row to return. Indexed from 0.
-	 * @return mixed Database query result in format specified by $output or null on failure
+	 * @param string|null $query  SQL query.
+	 * @param string      $output Optional. The required return type. One of OBJECT, ARRAY_A, or ARRAY_N, which correspond to
+	 *                            an stdClass object, an associative array, or a numeric array, respectively. Default OBJECT.
+	 * @param int         $y      Optional. Row to return. Indexed from 0.
+	 * @return array|object|null|void Database query result in format specified by $output or null on failure
      */
 	public function get_row( $query = null, $output = OBJECT, $y = 0 ) {
         $this->func_call = "\$db->get_row(\"$query\",$output,$y)";
+
+		if ( $this->check_current_query && $this->check_safe_collation( $query ) ) {
+			$this->check_current_query = false;
+		}
+
 		if ( $query ) {
 			$this->query( $query );
         } else {
@@ -1523,10 +1966,14 @@ This could mean your host's database server is down.</p>
      * @since 0.71
      *
      * @param string|null $query Optional. SQL query. Defaults to previous query.
-     * @param int $x Optional. Column to return. Indexed from 0.
+	 * @param int         $x     Optional. Column to return. Indexed from 0.
      * @return array Database query result. Array indexed from 0 by SQL result row number.
      */
 	public function get_col( $query = null , $x = 0 ) {
+		if ( $this->check_current_query && $this->check_safe_collation( $query ) ) {
+			$this->check_current_query = false;
+		}
+
 		if ( $query ) {
 			$this->query( $query );
         }
@@ -1546,14 +1993,20 @@ This could mean your host's database server is down.</p>
      *
      * @since 0.71
      *
-     * @param string $query SQL query.
-     * @param string $output Optional. Any of ARRAY_A | ARRAY_N | OBJECT | OBJECT_K constants. With one of the first three, return an array of rows indexed from 0 by SQL result row number.
-	 * 	Each row is an associative array (column => value, ...), a numerically indexed array (0 => value, ...), or an object. ( ->column = value ), respectively.
-	 * 	With OBJECT_K, return an associative array of row objects keyed by the value of each row's first column's value. Duplicate keys are discarded.
-     * @return mixed Database query results
+	 * @param string $query  SQL query.
+	 * @param string $output Optional. Any of ARRAY_A | ARRAY_N | OBJECT | OBJECT_K constants.
+	 *                       With one of the first three, return an array of rows indexed from 0 by SQL result row number.
+	 *                       Each row is an associative array (column => value, ...), a numerically indexed array (0 => value, ...), or an object. ( ->column = value ), respectively.
+	 *                       With OBJECT_K, return an associative array of row objects keyed by the value of each row's first column's value.
+	 *                       Duplicate keys are discarded.
+	 * @return array|object|null Database query results
      */
 	public function get_results( $query = null, $output = OBJECT ) {
         $this->func_call = "\$db->get_results(\"$query\", $output)";
+
+		if ( $this->check_current_query && $this->check_safe_collation( $query ) ) {
+			$this->check_current_query = false;
+		}
 
 		if ( $query ) {
 			$this->query( $query );
@@ -1578,7 +2031,7 @@ This could mean your host's database server is down.</p>
 		} elseif ( $output == ARRAY_A || $output == ARRAY_N ) {
             // Return an integer-keyed array of...
 			if ( $this->last_result ) {
-				foreach( (array) $this->last_result as $row ) {
+				foreach ( (array) $this->last_result as $row ) {
 					if ( $output == ARRAY_N ) {
                         // ...integer-keyed row arrays
 						$new_array[] = array_values( get_object_vars( $row ) );
@@ -1600,7 +2053,6 @@ This could mean your host's database server is down.</p>
 	 * Retrieves the character set for the given table.
 	 *
 	 * @since 4.2.0
-	 * @access protected
 	 *
 	 * @param string $table Table name.
 	 * @return string|FALSE Table character set,
@@ -1613,7 +2065,10 @@ This could mean your host's database server is down.</p>
 		}
 
 		$charsets = $columns = array();
-		$results = $this->get_results( "SHOW FULL COLUMNS FROM `$table`" );
+
+		$table_parts = explode( '.', $table );
+		$table = '`' . implode( '`.`', $table_parts ) . '`';
+		$results = $this->get_results( "SHOW FULL COLUMNS FROM $table" );
 		if ( ! $results ) {
 			return false;
 		}
@@ -1627,6 +2082,12 @@ This could mean your host's database server is down.</p>
 		foreach ( $columns as $column ) {
 			if ( ! empty( $column->Collation ) ) {
 				list( $charset ) = explode( '_', $column->Collation );
+
+				// If the current connection can't support utf8mb4 characters, let's only send 3-byte utf8 characters.
+				if ( 'utf8mb4' === $charset && ! $this->has_cap( 'utf8mb4' ) ) {
+					$charset = 'utf8';
+				}
+
 				$charsets[ strtolower( $charset ) ] = true;
 			}
 
@@ -1676,11 +2137,10 @@ This could mean your host's database server is down.</p>
 	 * Retrieves the character set for the given column.
 	 *
 	 * @since 4.2.0
-	 * @access public
 	 *
 	 * @param string $table  Table name.
 	 * @param string $column Column name.
-	 * @return mixed Column character set as a string. False if the column has no
+	 * @return string|false Column character set as a string. False if the column has no
 	 *               character set
 	 */
 	public function get_col_charset( $table, $column ) {
@@ -1688,7 +2148,7 @@ This could mean your host's database server is down.</p>
 		$columnkey = strtolower( $column );
 
 		// Skip this entirely if this isn't a MySQL database.
-		if ( false === $this->is_mysql ) {
+		if ( empty( $this->is_mysql ) ) {
 			return false;
 		}
 
@@ -1720,13 +2180,101 @@ This could mean your host's database server is down.</p>
 	}
 
 	/**
+	 * Retrieve the maximum string length allowed in a given column.
+	 * The length may either be specified as a byte length or a character length.
+	 *
+	 * @since 4.2.1
+	 *
+	 * @param string $table  Table name.
+	 * @param string $column Column name.
+	 * @return array|false array( 'length' => (int), 'type' => 'byte' | 'char' )
+	 *                              false if the column has no length (for example, numeric column)
+	 */
+	public function get_col_length( $table, $column ) {
+		$tablekey = strtolower( $table );
+		$columnkey = strtolower( $column );
+
+		// Skip this entirely if this isn't a MySQL database.
+		if ( empty( $this->is_mysql ) ) {
+			return false;
+		}
+
+		if ( empty( $this->col_meta[ $tablekey ] ) ) {
+			// This primes column information for us.
+			$table_charset = $this->get_table_charset( $table );
+			if ( ! $table_charset ) {
+				return $table_charset;
+			}
+		}
+
+		if ( empty( $this->col_meta[ $tablekey ][ $columnkey ] ) ) {
+			return false;
+		}
+
+		$typeinfo = explode( '(', $this->col_meta[ $tablekey ][ $columnkey ]->Type );
+
+		$type = strtolower( $typeinfo[0] );
+		if ( ! empty( $typeinfo[1] ) ) {
+			$length = trim( $typeinfo[1], ')' );
+		} else {
+			$length = false;
+		}
+
+		switch( $type ) {
+			case 'char':
+			case 'varchar':
+				return array(
+					'type'   => 'char',
+					'length' => (int) $length,
+				);
+
+			case 'binary':
+			case 'varbinary':
+				return array(
+					'type'   => 'byte',
+					'length' => (int) $length,
+				);
+
+			case 'tinyblob':
+			case 'tinytext':
+				return array(
+					'type'   => 'byte',
+					'length' => 255,        // 2^8 - 1
+				);
+
+			case 'blob':
+			case 'text':
+				return array(
+					'type'   => 'byte',
+					'length' => 65535,      // 2^16 - 1
+				);
+
+			case 'mediumblob':
+			case 'mediumtext':
+				return array(
+					'type'   => 'byte',
+					'length' => 16777215,   // 2^24 - 1
+				);
+
+			case 'longblob':
+			case 'longtext':
+				return array(
+					'type'   => 'byte',
+					'length' => 4294967295, // 2^32 - 1
+				);
+
+			default:
+				return false;
+		}
+	}
+
+	/**
 	 * Check if a string is ASCII.
 	 *
 	 * The negative regex is faster for non-ASCII strings, as it allows
 	 * the search to finish as soon as it encounters a non-ASCII character.
 	 *
 	 * @since 4.2.0
-	 * @access protected
 	 *
 	 * @param string $string String to check.
 	 * @return bool True if ASCII, false if not.
@@ -1744,10 +2292,66 @@ This could mean your host's database server is down.</p>
 	}
 
 	/**
+	 * Check if the query is accessing a collation considered safe on the current version of MySQL.
+	 *
+	 * @since 4.2.0
+	 *
+	 * @param string $query The query to check.
+	 * @return bool True if the collation is safe, false if it isn't.
+	 */
+	protected function check_safe_collation( $query ) {
+		if ( $this->checking_collation ) {
+			return true;
+		}
+
+		// We don't need to check the collation for queries that don't read data.
+		$query = ltrim( $query, "\r\n\t (" );
+		if ( preg_match( '/^(?:SHOW|DESCRIBE|DESC|EXPLAIN|CREATE)\s/i', $query ) ) {
+			return true;
+		}
+
+		// All-ASCII queries don't need extra checking.
+		if ( $this->check_ascii( $query ) ) {
+			return true;
+		}
+
+		$table = $this->get_table_from_query( $query );
+		if ( ! $table ) {
+			return false;
+		}
+
+		$this->checking_collation = true;
+		$collation = $this->get_table_charset( $table );
+		$this->checking_collation = false;
+
+		// Tables with no collation, or latin1 only, don't need extra checking.
+		if ( false === $collation || 'latin1' === $collation ) {
+			return true;
+		}
+
+		$table = strtolower( $table );
+		if ( empty( $this->col_meta[ $table ] ) ) {
+			return false;
+		}
+
+		// If any of the columns don't have one of these collations, it needs more sanity checking.
+		foreach ( $this->col_meta[ $table ] as $col ) {
+			if ( empty( $col->Collation ) ) {
+				continue;
+			}
+
+			if ( ! in_array( $col->Collation, array( 'utf8_general_ci', 'utf8_bin', 'utf8mb4_general_ci', 'utf8mb4_bin' ), true ) ) {
+				return false;
+			}
+		}
+
+		return true;
+	}
+
+	/**
 	 * Strips any invalid characters based on value/charset pairs.
 	 *
 	 * @since 4.2.0
-	 * @access protected
 	 *
 	 * @param array $data Array of value arrays. Each value array has the keys
 	 *                    'value' and 'charset'. An optional 'ascii' key can be
@@ -1758,50 +2362,58 @@ This could mean your host's database server is down.</p>
 	 *                        remove invalid characters
 	 */
 	protected function strip_invalid_text( $data ) {
-		// Some multibyte character sets that we can check in PHP.
-		$mb_charsets = array(
-			'ascii'   => 'ASCII',
-			'big5'    => 'BIG-5',
-			'eucjpms' => 'eucJP-win',
-			'gb2312'  => 'EUC-CN',
-			'ujis'    => 'EUC-JP',
-			'utf32'   => 'UTF-32',
-		);
-
-		$supported_charsets = array();
-		if ( function_exists( 'mb_list_encodings' ) ) {
-			$supported_charsets = mb_list_encodings();
-		}
-
 		$db_check_string = false;
 
 		foreach ( $data as &$value ) {
 			$charset = $value['charset'];
 
-			// Column isn't a string, or is latin1, which will will happily store anything.
-			if ( false === $charset || 'latin1' === $charset ) {
+			if ( is_array( $value['length'] ) ) {
+				$length = $value['length']['length'];
+				$truncate_by_byte_length = 'byte' === $value['length']['type'];
+			} else {
+				$length = false;
+				// Since we have no length, we'll never truncate.
+				// Initialize the variable to false. true would take us
+				// through an unnecessary (for this case) codepath below.
+				$truncate_by_byte_length = false;
+			}
+
+			// There's no charset to work with.
+			if ( false === $charset ) {
 				continue;
 			}
 
+			// Column isn't a string.
 			if ( ! is_string( $value['value'] ) ) {
 				continue;
 			}
 
+			$needs_validation = true;
+			if (
+				// latin1 can store any byte sequence
+				'latin1' === $charset
+			||
 			// ASCII is always OK.
-			if ( ! isset( $value['ascii'] ) && $this->check_ascii( $value['value'] ) ) {
-				continue;
+				( ! isset( $value['ascii'] ) && $this->check_ascii( $value['value'] ) )
+			) {
+				$truncate_by_byte_length = true;
+				$needs_validation = false;
 			}
 
-			// Convert the text locally.
-			if ( $supported_charsets ) {
-				if ( isset( $mb_charsets[ $charset ] ) && in_array( $mb_charsets[ $charset ], $supported_charsets ) ) {
-					$value['value'] = mb_convert_encoding( $value['value'], $mb_charsets[ $charset ], $mb_charsets[ $charset ] );
+			if ( $truncate_by_byte_length ) {
+				mbstring_binary_safe_encoding();
+				if ( false !== $length && strlen( $value['value'] ) > $length ) {
+					$value['value'] = substr( $value['value'], 0, $length );
+				}
+				reset_mbstring_encoding();
+
+				if ( ! $needs_validation ) {
 					continue;
 				}
 			}
 
 			// utf8 can be handled by regex, which is a bunch faster than a DB lookup.
-			if ( 'utf8' === $charset || 'utf8mb3' === $charset || 'utf8mb4' === $charset ) {
+			if ( ( 'utf8' === $charset || 'utf8mb3' === $charset || 'utf8mb4' === $charset ) && function_exists( 'mb_strlen' ) ) {
 				$regex = '/
 					(
 						(?: [\x00-\x7F]                  # single-byte sequences   0xxxxxxx
@@ -1811,7 +2423,7 @@ This could mean your host's database server is down.</p>
 						|   \xED[\x80-\x9F][\x80-\xBF]
 						|   [\xEE-\xEF][\x80-\xBF]{2}';
 
-				if ( 'utf8mb4' === $charset) {
+				if ( 'utf8mb4' === $charset ) {
 					$regex .= '
 						|    \xF0[\x90-\xBF][\x80-\xBF]{2} # four-byte sequences   11110xxx 10xxxxxx * 3
 						|    [\xF1-\xF3][\x80-\xBF]{3}
@@ -1819,11 +2431,16 @@ This could mean your host's database server is down.</p>
 					';
 				}
 
-				$regex .= '){1,50}                          # ...one or more times
+				$regex .= '){1,40}                          # ...one or more times
 					)
 					| .                                  # anything else
 					/x';
 				$value['value'] = preg_replace( $regex, '$1', $value['value'] );
+
+
+				if ( false !== $length && mb_strlen( $value['value'], 'UTF-8' ) > $length ) {
+					$value['value'] = mb_substr( $value['value'], 0, $length, 'UTF-8' );
+				}
 				continue;
 			}
 
@@ -1836,45 +2453,55 @@ This could mean your host's database server is down.</p>
 			$queries = array();
 			foreach ( $data as $col => $value ) {
 				if ( ! empty( $value['db'] ) ) {
-					if ( ! isset( $queries[ $value['charset'] ] ) ) {
-						$queries[ $value['charset'] ] = array();
+					// We're going to need to truncate by characters or bytes, depending on the length value we have.
+					if ( 'byte' === $value['length']['type'] ) {
+						// Using binary causes LEFT() to truncate by bytes.
+						$charset = 'binary';
+					} else {
+						$charset = $value['charset'];
 					}
 
-					// Split the CONVERT() calls by charset, so we can make sure the connection is right
-					$queries[ $value['charset'] ][ $col ] = $this->prepare( "CONVERT( %s USING {$value['charset']} )", $value['value'] );
+					if ( $this->charset ) {
+						$connection_charset = $this->charset;
+					} else {
+						if ( $this->use_mysqli ) {
+							$connection_charset = mysqli_character_set_name( $this->dbh );
+						} else {
+							$connection_charset = mysql_client_encoding();
+						}
+					}
+
+					if ( is_array( $value['length'] ) ) {
+						$length = sprintf( '%.0f', $value['length']['length'] );
+						$queries[ $col ] = $this->prepare( "CONVERT( LEFT( CONVERT( %s USING $charset ), $length ) USING $connection_charset )", $value['value'] );
+					} else if ( 'binary' !== $charset ) {
+						// If we don't have a length, there's no need to convert binary - it will always return the same result.
+						$queries[ $col ] = $this->prepare( "CONVERT( CONVERT( %s USING $charset ) USING $connection_charset )", $value['value'] );
+					}
+
+					unset( $data[ $col ]['db'] );
 				}
 			}
 
-			$connection_charset = $this->charset;
-			foreach ( $queries as $charset => $query ) {
+			$sql = array();
+			foreach ( $queries as $column => $query ) {
 				if ( ! $query ) {
 					continue;
 				}
 
-				// Change the charset to match the string(s) we're converting
-				if ( $charset !== $connection_charset ) {
-					$connection_charset = $charset;
-					$this->set_charset( $this->dbh, $charset );
-				}
-
-				$this->check_current_query = false;
-
-				$row = $this->get_row( "SELECT " . implode( ', ', $query ), ARRAY_N );
-				if ( ! $row ) {
-					$this->set_charset( $this->dbh, $connection_charset );
-					return false;
-				}
-
-				$cols = array_keys( $query );
-				$col_count = count( $cols );
-				for ( $ii = 0; $ii < $col_count; $ii++ ) {
-					$data[ $cols[ $ii ] ]['value'] = $row[ $ii ];
-				}
+				$sql[] = $query . " AS x_$column";
 			}
 
-			// Don't forget to change the charset back!
-			if ( $connection_charset !== $this->charset ) {
-				$this->set_charset( $this->dbh );
+			$this->check_current_query = false;
+			$row = $this->get_row( "SELECT " . implode( ', ', $sql ), ARRAY_A );
+			if ( ! $row ) {
+				return trigger_error( 'idb_strip_invalid_text_failure' );
+			}
+
+			foreach ( array_keys( $data ) as $column ) {
+				if ( isset( $row["x_$column"] ) ) {
+					$data[ $column ]['value'] = $row["x_$column"];
+				}
 			}
 		}
 
@@ -1885,12 +2512,17 @@ This could mean your host's database server is down.</p>
 	 * Strips any invalid characters from the query.
 	 *
 	 * @since 4.2.0
-	 * @access protected
 	 *
 	 * @param string $query Query to convert.
 	 * @return string|FALSE The converted query.
 	 */
 	protected function strip_invalid_text_from_query( $query ) {
+		// We don't need to check the collation for queries that don't read data.
+		$trimmed_query = ltrim( $query, "\r\n\t (" );
+		if ( preg_match( '/^(?:SHOW|DESCRIBE|DESC|EXPLAIN|CREATE)\s/i', $trimmed_query ) ) {
+			return $query;
+		}
+
 		$table = $this->get_table_from_query( $query );
 		if ( $table ) {
 			$charset = $this->get_table_charset( $table );
@@ -1910,6 +2542,7 @@ This could mean your host's database server is down.</p>
 			'value'   => $query,
 			'charset' => $charset,
 			'ascii'   => false,
+			'length'  => false,
 		);
 
 		$data = $this->strip_invalid_text( array( $data ) );
@@ -1924,7 +2557,6 @@ This could mean your host's database server is down.</p>
 	 * Strips any invalid characters from the string for a given table and column.
 	 *
 	 * @since 4.2.0
-	 * @access public
 	 *
 	 * @param string $table  Table name.
 	 * @param string $column Column name.
@@ -1932,7 +2564,7 @@ This could mean your host's database server is down.</p>
 	 * @return string|FALSE The converted string.
 	 */
 	public function strip_invalid_text_for_column( $table, $column, $value ) {
-		if ( ! is_string( $value ) || $this->check_ascii( $value ) ) {
+		if ( ! is_string( $value ) ) {
 			return $value;
 		}
 
@@ -1949,7 +2581,7 @@ This could mean your host's database server is down.</p>
 			$column => array(
 				'value'   => $value,
 				'charset' => $charset,
-				'ascii'   => false,
+				'length'  => $this->get_col_length( $table, $column ),
 			)
 		);
 
@@ -1965,7 +2597,6 @@ This could mean your host's database server is down.</p>
 	 * Find the first table name referenced in a query.
 	 *
 	 * @since 4.2.0
-	 * @access protected
 	 *
 	 * @param string $query The query to search.
 	 * @return string|false $table The table name found, or false if a table couldn't be found.
@@ -1977,11 +2608,8 @@ This could mean your host's database server is down.</p>
 		// Allow (select...) union [...] style queries. Use the first query's table name.
 		$query = ltrim( $query, "\r\n\t (" );
 
-		/*
-		 * Strip everything between parentheses except nested selects and use only 1,000
-		 * chars of the query.
-		 */
-		$query = preg_replace( '/\((?!\s*select)[^(]*?\)/is', '()', substr( $query, 0, 1000 ) );
+		// Strip everything between parentheses except nested selects.
+		$query = preg_replace( '/\((?!\s*select)[^(]*?\)/is', '()', $query );
 
 		// Quickly match most common queries.
 		if ( preg_match( '/^\s*(?:'
@@ -1989,17 +2617,23 @@ This could mean your host's database server is down.</p>
 				. '|INSERT(?:\s+LOW_PRIORITY|\s+DELAYED|\s+HIGH_PRIORITY)?(?:\s+IGNORE)?(?:\s+INTO)?'
 				. '|REPLACE(?:\s+LOW_PRIORITY|\s+DELAYED)?(?:\s+INTO)?'
 				. '|UPDATE(?:\s+LOW_PRIORITY)?(?:\s+IGNORE)?'
-				. '|DELETE(?:\s+LOW_PRIORITY|\s+QUICK|\s+IGNORE)*(?:\s+FROM)?'
-				. ')\s+`?([\w-]+)`?/is', $query, $maybe ) ) {
-			return $maybe[1];
+				. '|DELETE(?:\s+LOW_PRIORITY|\s+QUICK|\s+IGNORE)*(?:.+?FROM)?'
+				. ')\s+((?:[0-9a-zA-Z$_.`-]|[\xC2-\xDF][\x80-\xBF])+)/is', $query, $maybe ) ) {
+			return str_replace( '`', '', $maybe[1] );
 		}
 
-		// SHOW TABLE STATUS and SHOW TABLES
-		if ( preg_match( '/^\s*(?:'
-				. 'SHOW\s+TABLE\s+STATUS.+(?:LIKE\s+|WHERE\s+Name\s*=\s*)'
-				. '|SHOW\s+(?:FULL\s+)?TABLES.+(?:LIKE\s+|WHERE\s+Name\s*=\s*)'
-				. ')\W([\w-]+)\W/is', $query, $maybe ) ) {
-			return $maybe[1];
+		// SHOW TABLE STATUS and SHOW TABLES WHERE Name = 'wp_posts'
+		if ( preg_match( '/^\s*SHOW\s+(?:TABLE\s+STATUS|(?:FULL\s+)?TABLES).+WHERE\s+Name\s*=\s*("|\')((?:[0-9a-zA-Z$_.-]|[\xC2-\xDF][\x80-\xBF])+)\\1/is', $query, $maybe ) ) {
+			return $maybe[2];
+		}
+
+		// SHOW TABLE STATUS LIKE and SHOW TABLES LIKE 'wp\_123\_%'
+		// This quoted LIKE operand seldom holds a full table name.
+		// It is usually a pattern for matching a prefix so we just
+		// strip the trailing % and unescape the _ to get 'wp_123_'
+		// which drop-ins can use for routing these SQL statements.
+		if ( preg_match( '/^\s*SHOW\s+(?:TABLE\s+STATUS|(?:FULL\s+)?TABLES)\s+(?:WHERE\s+Name\s+)?LIKE\s*("|\')((?:[\\\\0-9a-zA-Z$_.-]|[\xC2-\xDF][\x80-\xBF])+)%?\\1/is', $query, $maybe ) ) {
+			return str_replace( '\\_', '_', $maybe[2] );
 		}
 
 		// Big pattern for the rest of the table-related queries.
@@ -2017,8 +2651,8 @@ This could mean your host's database server is down.</p>
 				. '|LOAD\s+DATA.*INFILE.*INTO\s+TABLE'
 				. '|(?:GRANT|REVOKE).*ON\s+TABLE'
 				. '|SHOW\s+(?:.*FROM|.*TABLE)'
-				. ')\s+\(*\s*`?([\w-]+)`?\s*\)*/is', $query, $maybe ) ) {
-			return $maybe[1];
+				. ')\s+\(*\s*((?:[0-9a-zA-Z$_.`-]|[\xC2-\xDF][\x80-\xBF])+)\s*\)*/is', $query, $maybe ) ) {
+			return str_replace( '`', '', $maybe[1] );
 		}
 
 		return false;
@@ -2029,19 +2663,20 @@ This could mean your host's database server is down.</p>
 	 *
 	 * @since 3.5.0
 	 *
-	 * @access protected
 	 */
 	protected function load_col_info() {
 		if ( $this->col_info )
 			return;
 
 		if ( $this->use_mysqli ) {
-			for ( $i = 0; $i < @mysqli_num_fields( $this->result ); $i++ ) {
-				$this->col_info[ $i ] = @mysqli_fetch_field( $this->result );
+			$num_fields = mysqli_num_fields( $this->result );
+			for ( $i = 0; $i < $num_fields; $i++ ) {
+				$this->col_info[ $i ] = mysqli_fetch_field( $this->result );
 			}
 		} else {
-			for ( $i = 0; $i < @mysql_num_fields( $this->result ); $i++ ) {
-				$this->col_info[ $i ] = @mysql_fetch_field( $this->result, $i );
+			$num_fields = mysql_num_fields( $this->result );
+			for ( $i = 0; $i < $num_fields; $i++ ) {
+				$this->col_info[ $i ] = mysql_fetch_field( $this->result, $i );
 			}
 		}
 	}
@@ -2051,8 +2686,8 @@ This could mean your host's database server is down.</p>
      *
      * @since 0.71
      *
-     * @param string $info_type Optional. Type one of name, table, def, max_length, not_null, primary_key, multiple_key, unique_key, numeric, blob, type, unsigned, zerofill
-     * @param int $col_offset Optional. 0: col name. 1: which table the col's in. 2: col's max length. 3: if the col is numeric. 4: col's type
+	 * @param string $info_type  Optional. Type one of name, table, def, max_length, not_null, primary_key, multiple_key, unique_key, numeric, blob, type, unsigned, zerofill
+	 * @param int    $col_offset Optional. 0: col name. 1: which table the col's in. 2: col's max length. 3: if the col is numeric. 4: col's type
      * @return mixed Column Results
      */
 	public function get_col_info( $info_type = 'name', $col_offset = -1 ) {
@@ -2062,7 +2697,7 @@ This could mean your host's database server is down.</p>
 			if ( $col_offset == -1 ) {
                 $i = 0;
                 $new_array = array();
-				foreach( (array) $this->col_info as $col ) {
+				foreach ( (array) $this->col_info as $col ) {
                     $new_array[$i] = $col->{$info_type};
                     $i++;
                 }
@@ -2076,7 +2711,9 @@ This could mean your host's database server is down.</p>
     /**
      * Starts the timer, for debugging purposes.
      *
-     * @return bool
+	 * @since 1.5.0
+	 *
+	 * @return true
      */
     public function timer_start() {
 		$this->time_start = microtime( true );
@@ -2106,7 +2743,7 @@ This could mean your host's database server is down.</p>
      * @return false|void
      */
     public function bail($message, $error_code = '500') {
-        if (!$this->show_errors) {
+        if ( !$this->show_errors ) {
             $this->error = $message;
             return false;
         }
@@ -2114,24 +2751,50 @@ This could mean your host's database server is down.</p>
     }
 
     /**
+	 * Closes the current database connection.
+	 *
+	 * @since 4.5.0
+	 *
+	 * @return bool True if the connection was successfully closed, false if it wasn't,
+	 *              or the connection doesn't exist.
+	 */
+	public function close() {
+		if ( ! $this->dbh ) {
+			return false;
+		}
+
+		if ( $this->use_mysqli ) {
+			$closed = mysqli_close( $this->dbh );
+		} else {
+			$closed = mysql_close( $this->dbh );
+		}
+
+		if ( $closed ) {
+			$this->dbh = null;
+			$this->ready = false;
+			$this->has_connected = false;
+		}
+
+		return $closed;
+	}
+
+	/**
      * Whether MySQL database is at least the required minimum version.
      *
      * @since 2.5.0
      *
      * @return error
      */
-    public function check_database_version() {
-		global $required_mysql_version;
-		
+    public function check_database_version($required_mysql_version) {	
 		if (empty($required_mysql_version))
 			return true;
 
 		// Make sure the server has the required MySQL version
 		if (version_compare($this->db_version(), $required_mysql_version, '<') )
-            return trigger_error("database_version: <strong>ERROR</strong>: App %s requires MySQL 4.1.2 or higher ", E_USER_ERROR);
+            return false;
     }
-    
-    /**
+
+	/**
      * The database character collate.
      *
      * @since 3.5.0
@@ -2153,33 +2816,34 @@ This could mean your host's database server is down.</p>
      * Determine if a database supports a particular feature.
      *
      * @since 2.7.0
-     * @since 4.1.0 Support was added for the 'utf8mb4' feature.
+	 * @since 4.1.0 Added support for the 'utf8mb4' feature.
+	 * @since 4.6.0 Added support for the 'utf8mb4_520' feature.
      * 
      * @see idb::db_version()
      *
      * @param string $db_cap The feature to check for. Accepts 'collation',
      *                       'group_concat', 'subqueries', 'set_charset',
-     *                       or 'utf8mb4'.
+	 *                       'utf8mb4', or 'utf8mb4_520'.
 	 * @return int|false Whether the database feature is supported, false otherwise.
      */
     public function has_cap( $db_cap ) {
         $version = $this->db_version();
 
-	switch ( strtolower( $db_cap ) ) {
+		switch ( strtolower( $db_cap ) ) {
             case 'collation' :    // @since 2.5.0
             case 'group_concat' : // @since 2.7.0
             case 'subqueries' :   // @since 2.7.0
-		return version_compare( $version, '4.1', '>=' );
+				return version_compare( $version, '4.1', '>=' );
             case 'set_charset' :
-		return version_compare( $version, '5.0.7', '>=' );
+				return version_compare( $version, '5.0.7', '>=' );
             case 'utf8mb4' :      // @since 4.1.0
                 if ( version_compare( $version, '5.5.3', '<' ) ) {
-                        return false;
+                    return false;
                 }
                 if ( $this->use_mysqli ) {
-                        $client_version = mysqli_get_client_info();
+                    $client_version = mysqli_get_client_info();
                 } else {
-                        $client_version = mysql_get_client_info();
+                    $client_version = mysql_get_client_info();
                 }
 
                 /*
@@ -2187,12 +2851,14 @@ This could mean your host's database server is down.</p>
                  * mysqlnd has supported utf8mb4 since 5.0.9.
                  */
                 if ( false !== strpos( $client_version, 'mysqlnd' ) ) {
-                        $client_version = preg_replace( '/^\D+([\d.]+).*/', '$1', $client_version );
-                        return version_compare( $client_version, '5.0.9', '>=' );
+					$client_version = preg_replace( '/^\D+([\d.]+).*/', '$1', $client_version );
+					return version_compare( $client_version, '5.0.9', '>=' );
                 } else {
-                        return version_compare( $client_version, '5.5.3', '>=' );
+                    return version_compare( $client_version, '5.5.3', '>=' );
                 }
-	}
+			case 'utf8mb4_520' : // @since 4.6.0
+				return version_compare( $version, '5.6', '>=' );
+		}
 
         return false;
     }
@@ -2205,7 +2871,7 @@ This could mean your host's database server is down.</p>
      *
      * @since 2.5.0
      *
-     * @return string The name of the calling function
+	 * @return string|array The name of the calling function
      */
     public function get_caller() {
         $trace = array_reverse(debug_backtrace());
