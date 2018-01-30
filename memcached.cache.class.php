@@ -1,11 +1,11 @@
 <?php
 /**
  * iDB Memcached Cache Class
- * 
+ *
  * Version: 1.0
  * Started: 19-03-2015
- * Updated: 19-03-2015
- * 
+ * Updated: 30-01-2018
+ *
  */
 
 spl_autoload_register(function($class){
@@ -20,20 +20,24 @@ class iDB_Cache extends idb_Cache_Core {
 
     private static $connected = false;
     private $memcached = null;
-    private $host = null;
-    private $port = null;
-    private $compress = null;
-    private $expiry   = null;
+    private $host = 'localhost';
+    private $port = 11211;
+    private $compress = 0;
+    private $expiry   = 3600;
 
     /**
      * Behaves as a contructor
-     * And overwrites the init of the Q_Core class
+     * And overwrites the init of the idb_Cache_Core class
      */
-    protected function init($params = array()){
-        $this->host     = !empty($params[0]) ? $params[0] : 'localhost';
-        $this->port     = !empty($params[1]) ? $params[1] : 11211;
-        $this->compress = !empty($params[2]) ? $params[2] : 0;
-        $this->expiry   = !empty($params[3]) ? $params[3] : 3600;
+    protected function init(){
+        if (defined('DB_MEMCACHED_HOST'))
+            $this->host = DB_MEMCACHED_HOST;
+        if (defined('DB_MEMCACHED_PORT'))
+            $this->port = DB_MEMCACHED_PORT;
+        if (defined('DB_MEMCACHED_COMPRESS'))
+            $this->compress = DB_MEMCACHED_COMPRESS;
+        if (defined('DB_MEMCACHED_EXPIRY'))
+            $this->expiry = DB_MEMCACHED_EXPIRY;
     }
 
     public function delete($key, $timeout = 0) {
@@ -79,7 +83,7 @@ class iDB_Cache extends idb_Cache_Core {
 
             if($this->memcached->addServer($this->host, $this->port))
                 return self::$connected = true;
-            
+
             $this->show_errors ? trigger_error("Could not connect to memcache server", E_USER_WARNING) : null;
             return false;
         }
