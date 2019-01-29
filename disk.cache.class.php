@@ -1,11 +1,11 @@
 <?php
 /**
  * iDB Disk Cache Class
- * 
+ *
  * Version: 1.0
  * Started: 05-01-2015
- * Updated: 06-01-2015
- * 
+ * Updated: 29-01-2019
+ *
  */
 
 spl_autoload_register(function($class){
@@ -55,10 +55,10 @@ class iDB_Cache extends idb_Cache_Core {
             $this->show_errors ? trigger_error("Could not open cache dir: $this->cache_dir", E_USER_WARNING) : null;
             return false;
         }
-        
+
         try {
             $value = serialize($value);
-        } 
+        }
         catch (Exception $e) {
             $this->show_errors ? trigger_error("Failed to serialize cache value: $e" , E_USER_WARNING) : null;
             return false;
@@ -76,19 +76,26 @@ class iDB_Cache extends idb_Cache_Core {
      * @return mixed Database query results
      */
     function get($key) {
-        if (empty($key))
+        if (empty($key)) {
             return null;
+        }
 
         // The would be cache file for this query
         $cache_file = $this->cache_dir . '/' . $key;
 
-        // Try to get previously cached version
-        if (file_exists($cache_file)) {
-            // Only use this cache file if less than 'cache_timeout' (hours)
-            if ((time() - filemtime($cache_file)) > ($this->cache_timeout * 3600))
+        if (!file_exists($cache_file)) {
+            return null;
+        }
+
+        try {
+            if ((time() - filemtime($cache_file)) > ($this->cache_timeout * 3600)) {
                 unlink($cache_file);
-            else
+            }
+            else {
                 return unserialize(file_get_contents($cache_file));
+            }
+        } catch (Exception $e) {
+            return null;
         }
     }
 }
