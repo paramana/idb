@@ -36,8 +36,8 @@ class iDB_Cache extends idb_Cache_Core {
             $this->port = DB_MEMCACHED_PORT;
         if (defined('DB_MEMCACHED_COMPRESS'))
             $this->compress = DB_MEMCACHED_COMPRESS;
-        if (defined('DB_MEMCACHED_EXPIRY'))
-            $this->expiry = DB_MEMCACHED_EXPIRY;
+        if (defined('DB_MEMCACHED_DEFAULT_EXPIRY'))
+            $this->expiry = DB_MEMCACHED_DEFAULT_EXPIRY;
     }
 
     public function delete($key, $timeout = 0) {
