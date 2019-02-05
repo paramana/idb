@@ -1,11 +1,11 @@
 <?php
 /**
  * iDB Disk Cache Class
- * 
- * Version: 1.0
+ *
+ * Version: 1.1
  * Started: 05-01-2015
- * Updated: 06-01-2015
- * 
+ * Updated: 05-02-2019
+ *
  */
 
 /**
@@ -15,13 +15,13 @@
 abstract class idb_Cache_Core {
     /**
      * Cache expiry
-     * Note: this is hours
+     * Note: this is in seconds
      *
      * @since 1.1
      * @access public
      * @var int
      */
-    var $cache_timeout = 24;
+    var $cache_timeout = 24 * 60 * 60;
 
     /**
      * If true it caches the inserts also
@@ -44,7 +44,7 @@ abstract class idb_Cache_Core {
     /**
      *
      * @param string $cache_type The type of cache to use defaults to disk, can be apc, memcache
-     * 
+     *
      */
 	function __construct($idb) {
 		register_shutdown_function( array( $this, '__destruct' ) );
@@ -81,15 +81,15 @@ abstract class idb_Cache_Core {
     /**
      * The init function
      * Can be overidden from the child class
-     * 
+     *
      */
     protected function init() {
-        
+
     }
 
     /**
      * Stores a query in cache
-     * 
+     *
      * @param string $query the string result of a query to store
      * @param boolean $is_insert if is an insert or not
      */
@@ -98,6 +98,7 @@ abstract class idb_Cache_Core {
             return false;
 
         $cache_name = md5($query);
+        $cache_ttl = (float)(!$ttl ? $this->cache_timeout : $ttl);
 
         // Cache all result values
         $result_cache = array(
@@ -105,9 +106,10 @@ abstract class idb_Cache_Core {
             'last_result' => $this->idb->last_result,
             'num_rows' => $this->idb->num_rows,
             'return_value' => $this->idb->num_rows,
+            'expire_at'=>time() + $cache_ttl
         );
 
-        $this->set($cache_name, $result_cache, !$ttl ? $this->cache_timeout : $ttl);
+        $this->set($cache_name, $result_cache, $cache_ttl);
 
         return true;
     }
