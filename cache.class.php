@@ -2,7 +2,7 @@
 /**
  * iDB Disk Cache Class
  *
- * Version: 1.1
+ * Version: 1.11
  * Started: 05-01-2015
  * Updated: 05-02-2019
  *
@@ -42,6 +42,15 @@ abstract class idb_Cache_Core {
     var $show_errors = false;
 
     /**
+     * This is used to prefix cache names
+     *
+     * @since 1.11
+     * @access private
+     * @var string
+     */
+    var $cache_name_prefix = "";
+
+    /**
      *
      * @param string $cache_type The type of cache to use defaults to disk, can be apc, memcache
      *
@@ -57,6 +66,9 @@ abstract class idb_Cache_Core {
 
         if (defined('DB_CACHE_INSERTS') && DB_CACHE_INSERTS)
             $this->cache_inserts = DB_CACHE_INSERTS;
+
+        if (defined('DB_CACHE_NAME_PREFIX') && DB_CACHE_NAME_PREFIX)
+            $this->cache_name_prefix = DB_CACHE_NAME_PREFIX;
 
         if (empty($idb))
             return $this->show_errors ? trigger_error("idb class not found", E_USER_WARNING) : null;
@@ -97,7 +109,7 @@ abstract class idb_Cache_Core {
         if (!$this->cache_inserts && $is_insert)
             return false;
 
-        $cache_name = md5($query);
+        $cache_name = sha1($this->cache_name_prefix . $query);
         $cache_ttl = (float)(!$ttl ? $this->cache_timeout : $ttl);
 
         // Cache all result values
@@ -106,7 +118,7 @@ abstract class idb_Cache_Core {
             'last_result' => $this->idb->last_result,
             'num_rows' => $this->idb->num_rows,
             'return_value' => $this->idb->num_rows,
-            'expire_at'=>time() + $cache_ttl
+            'expire_at' => time() + $cache_ttl
         );
 
         $this->set($cache_name, $result_cache, $cache_ttl);
@@ -122,7 +134,7 @@ abstract class idb_Cache_Core {
      * @return mixed Database query results
      */
     function get_cache($query) {
-        $cache_name = md5($query);
+        $cache_name = sha1($this->cache_name_prefix . $query);
 
         $result_cache = $this->get($cache_name);
 
