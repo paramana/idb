@@ -4,7 +4,7 @@
  *
  * Version: 1.11
  * Started: 05-01-2015
- * Updated: 05-02-2019
+ * Updated: 13-02-2019
  *
  */
 
@@ -48,7 +48,7 @@ abstract class idb_Cache_Core {
      * @access private
      * @var string
      */
-    var $cache_name_prefix = "";
+    var $cache_prefix = "";
 
     /**
      *
@@ -67,8 +67,8 @@ abstract class idb_Cache_Core {
         if (defined('DB_CACHE_INSERTS') && DB_CACHE_INSERTS)
             $this->cache_inserts = DB_CACHE_INSERTS;
 
-        if (defined('DB_CACHE_NAME_PREFIX') && DB_CACHE_NAME_PREFIX)
-            $this->cache_name_prefix = DB_CACHE_NAME_PREFIX;
+        if (defined('DB_CACHE_PREFIX') && DB_CACHE_PREFIX)
+            $this->cache_prefix = DB_CACHE_PREFIX;
 
         if (empty($idb))
             return $this->show_errors ? trigger_error("idb class not found", E_USER_WARNING) : null;
@@ -109,7 +109,7 @@ abstract class idb_Cache_Core {
         if (!$this->cache_inserts && $is_insert)
             return false;
 
-        $cache_name = sha1($this->cache_name_prefix . $query);
+        $cache_name = sha1($this->cache_prefix . $query);
         $cache_ttl = (float)(!$ttl ? $this->cache_timeout : $ttl);
 
         // Cache all result values
@@ -134,7 +134,7 @@ abstract class idb_Cache_Core {
      * @return mixed Database query results
      */
     function get_cache($query) {
-        $cache_name = sha1($this->cache_name_prefix . $query);
+        $cache_name = sha1($this->cache_prefix . $query);
 
         $result_cache = $this->get($cache_name);
 
