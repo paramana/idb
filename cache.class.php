@@ -109,7 +109,7 @@ abstract class idb_Cache_Core {
         if (!$this->cache_inserts && $is_insert)
             return false;
 
-        $cache_name = sha1($this->cache_prefix . $query);
+        $cache_name = md5($this->cache_prefix . $query);
         $cache_ttl = (float)(!$ttl ? $this->cache_timeout : $ttl);
 
         // Cache all result values
@@ -134,7 +134,7 @@ abstract class idb_Cache_Core {
      * @return mixed Database query results
      */
     function get_cache($query) {
-        $cache_name = sha1($this->cache_prefix . $query);
+        $cache_name = md5($this->cache_prefix . $query);
 
         $result_cache = $this->get($cache_name);
 
