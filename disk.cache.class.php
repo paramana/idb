@@ -2,9 +2,9 @@
 /**
  * iDB Disk Cache Class
  *
- * Version: 1.1
+ * Version: 1.2
  * Started: 05-01-2015
- * Updated: 05-02-2019
+ * Updated: 04-06-2020
  *
  */
 
@@ -64,7 +64,7 @@ class iDB_Cache extends idb_Cache_Core {
             return false;
         }
 
-        error_log($value, 3, $cache_file);
+        error_log(gzdeflate($value, 3), 3, $cache_file);
         return true;
     }
 
@@ -88,7 +88,7 @@ class iDB_Cache extends idb_Cache_Core {
         }
 
         try {
-            $cache_content = unserialize(file_get_contents($cache_file));
+            $cache_content = unserialize(gzinflate(file_get_contents($cache_file)));
 
             if (!empty($cache_content["expire_at"]) && time() > $cache_content["expire_at"]) {
                 unlink($cache_file);
