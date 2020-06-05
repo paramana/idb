@@ -97,6 +97,10 @@ class iDB_Cache extends idb_Cache_Core {
                 return $cache_content;
             }
         } catch (Exception $e) {
+            if (file_exists($cache_file)) {
+                unlink($cache_file);
+            }
+
             return null;
         }
     }
