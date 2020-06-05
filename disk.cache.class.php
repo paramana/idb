@@ -92,6 +92,7 @@ class iDB_Cache extends idb_Cache_Core {
 
             if (!empty($cache_content["expire_at"]) && time() > $cache_content["expire_at"]) {
                 unlink($cache_file);
+                return null;
             }
             else {
                 return $cache_content;
