@@ -90,7 +90,7 @@ class iDB_Cache extends idb_Cache_Core {
         try {
             $cache_content = unserialize(gzinflate(file_get_contents($cache_file)));
 
-            if (!empty($cache_content["expire_at"]) && time() > $cache_content["expire_at"]) {
+            if (!empty($cache_content["expire_at"]) && time() > $cache_content["expire_at"] || !$cache_content) {
                 unlink($cache_file);
                 return null;
             }
