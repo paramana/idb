@@ -30,6 +30,8 @@ define( 'EZSQL_VERSION', 'WP1.25' );
  * @since 0.71
  */
 define( 'OBJECT', 'OBJECT' );
+// phpcs:ignore Generic.NamingConventions.UpperCaseConstantName.ConstantNotUpperCase
+define( 'object', 'OBJECT' ); // Back compat.
 
 /**
  * @since 2.5.0
