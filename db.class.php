@@ -2,23 +2,24 @@
 
 /**
  * iDB Class
- * 
+ *
  * Version: 1.1
  * Started: 02-02-2010
- * Updated: 12-04-2016
+ * Updated From WP: 12-04-2016
+ * Updated: 18-05-2022
  *
  * Original code from {@link http://php.justinvincent.com Justin Vincent (justin@visunet.ie)}
  * and from wordpress {@link http://wordpress.org/}
- * 
+ *
  * This is a clone of the wp db class
  * https://github.com/WordPress/WordPress/blob/master/wp-includes/wp-db.php
- * 
+ *
  * with some added file caching functionality
- * 
+ *
  * from wp commit 980668299c4756c0f7019d2265cc679d895ebabc on 10/02/2015
- * 
+ *
  * @source https://github.com/giannis/idb
- * 
+ *
  */
 
 /**
@@ -53,6 +54,14 @@ define( 'ARRAY_N', 'ARRAY_N' );
  *
  */
 class idb {
+
+    /**
+     * A custom logger to catch errors
+     *
+     * @access private
+     * @var logger
+     */
+    var $logger;
 
     /**
      * Whether to show SQL/DB errors.
@@ -145,7 +154,7 @@ class idb {
 	 * @var mixed
 	 */
 	protected $result;
-    
+
     /**
 	 * Cached column info, for sanity checking data before inserting
 	 *
@@ -172,7 +181,7 @@ class idb {
 	 * @var bool
 	 */
 	protected $check_current_query = true;
-    
+
 	/**
      * Saved info on the table column
      *
@@ -190,7 +199,7 @@ class idb {
      * @var array
      */
     var $queries;
-    
+
     /**
 	 * The number of times to retry reconnecting before dying.
 	 *
@@ -276,7 +285,7 @@ class idb {
      * @var string
      */
     var $cache_type = "disk";
-    
+
 	/**
 	 * Whether to use mysqli over mysql.
 	 *
@@ -294,7 +303,7 @@ class idb {
 	 * @var bool
 	 */
 	private $has_connected = false;
-    
+
     /**
      * Connects to the database server and selects a database
      *
@@ -314,7 +323,7 @@ class idb {
 
         if (DEBUG)
             $this->show_errors();
-        
+
         /* Use ext/mysqli if it exists and:
 		 *  - We are running PHP 5.5 or greater, or
 		 */
@@ -323,7 +332,7 @@ class idb {
 				$this->use_mysqli = true;
 			}
 		}
-        
+
         $this->init_cache();
 
         $this->dbuser = $dbuser;
@@ -344,7 +353,7 @@ class idb {
     public function __destruct() {
         return true;
     }
-    
+
     /**
 	 * PHP5 style magic getter, used to lazy-load expensive data.
 	 *
@@ -428,10 +437,10 @@ class idb {
         else {
             $this->collate = 'utf8_general_ci';
         }
-        
+
 		if ( defined( 'DB_CHARSET' ) )
             $this->charset = DB_CHARSET;
-        
+
         if ( ( $this->use_mysqli && ! ( $this->dbh instanceof mysqli ) )
 		  || ( empty( $this->dbh ) || ! ( $this->dbh instanceof mysqli ) ) ) {
 			return;
@@ -498,13 +507,13 @@ class idb {
 	public function select( $db, $dbh = null ) {
 		if ( is_null($dbh) )
             $dbh = $this->dbh;
-        
+
         if ( $this->use_mysqli ) {
 			$success = @mysqli_select_db( $dbh, $db );
 		} else {
 			$success = @mysql_select_db( $db, $dbh );
 		}
-        
+
 		if ( ! $success ) {
             $this->ready = false;
             $this->bail(sprintf('
@@ -539,7 +548,7 @@ class idb {
 				return mysql_real_escape_string( $string, $this->dbh );
 			}
 		}
-        
+
         return addslashes($string);
     }
 
@@ -634,7 +643,7 @@ class idb {
 		array_walk( $args, array( $this, 'escape_by_ref' ) );
 		return @vsprintf( $query, $args );
     }
-    
+
     /**
 	 * First half of escaping for LIKE special characters % and _ before preparing for MySQL.
 	 *
@@ -660,7 +669,7 @@ class idb {
 	public function esc_like( $text ) {
 		return addcslashes( $text, '_%\\' );
 	}
-    
+
     /**
      * Print SQL/DB error.
      *
@@ -672,7 +681,7 @@ class idb {
      */
 	public function print_error( $str = '' ) {
         global $EZSQL_ERROR;
-        
+
         if ( !$str ) {
 			if ( $this->use_mysqli ) {
 				$str = mysqli_error( $this->dbh );
@@ -680,7 +689,7 @@ class idb {
 				$str = mysql_error( $this->dbh );
 			}
 		}
-        
+
 		$EZSQL_ERROR[] = array( 'query' => $this->last_query, 'error_str' => $str );
 
 		if ( $this->suppress_errors )
@@ -699,8 +708,13 @@ class idb {
         if (!empty($log_file) && ('syslog' != $log_file) && !@is_writable($log_file))
             $log_error = false;
 
-        if ($log_error)
+        if ($log_error) {
             @error_log($error_str, 0);
+
+            if (!empty($this->logger)) {
+                $this->logger->error($error_str);
+            }
+        }
 
         // Is error output turned on or not..
         if (!$this->show_errors)
@@ -781,7 +795,7 @@ class idb {
 		$this->last_query  = null;
 		$this->rows_affected = $this->num_rows = 0;
 		$this->last_error  = '';
-        
+
         if ( $this->use_mysqli && $this->result instanceof mysqli_result ) {
 			mysqli_free_result( $this->result );
 			$this->result = null;
@@ -814,14 +828,14 @@ class idb {
 	 */
     public function db_connect( $allow_bail = true ) {
         $this->is_mysql = true;
-        
+
         /*
 		 * Deprecated in 3.9+ when using MySQLi. No equivalent
 		 * $new_link parameter exists for mysqli_* functions.
 		 */
         $new_link = defined( 'MYSQL_NEW_LINK' ) ? MYSQL_NEW_LINK : true;
 		$client_flags = defined( 'MYSQL_CLIENT_FLAGS' ) ? MYSQL_CLIENT_FLAGS : 0;
-        
+
         if ( $this->use_mysqli ) {
 			$this->dbh = mysqli_init();
 
@@ -910,7 +924,7 @@ This could mean your host's database server is down.</p>
 
 		return false;
     }
-    
+
     /**
 	 * Check that the connection to the database is still up. If not, try to reconnect.
 	 *
@@ -1001,7 +1015,7 @@ This could mean your host's database server is down.</p>
 
         // Log how the function was called
         $this->func_call = "\$db->query(\"$query\")";
-        
+
         // If we're writing to the database, make sure the query will write safely.
 		if ( $this->check_current_query && ! $this->check_ascii( $query ) ) {
 			$stripped_query = $this->strip_invalid_text_from_query( $query );
@@ -1016,7 +1030,7 @@ This could mean your host's database server is down.</p>
 
 		$this->check_current_query = true;
 
-        
+
         // Keep track of the last query for debug..
         $this->last_query = $query;
 
@@ -1063,7 +1077,7 @@ This could mean your host's database server is down.</p>
             $this->print_error();
             return false;
         }
-        
+
         $is_insert = false;
 		if ( preg_match( '/^\s*(create|alter|truncate|drop)\s/i', $query ) ) {
             $return_val = $this->result;
@@ -1110,7 +1124,7 @@ This could mean your host's database server is down.</p>
 
         return $return_val;
     }
-    
+
 	/**
 	 * Internal function to perform the mysql_query() call.
 	 *
@@ -1207,7 +1221,7 @@ This could mean your host's database server is down.</p>
         if ( ! in_array( strtoupper( $type ), array( 'REPLACE', 'INSERT' ) ) ) {
             return false;
         }
-        
+
 		$data = $this->process_fields( $table, $data, $format );
 		if ( false === $data ) {
 			return false;
@@ -1229,7 +1243,7 @@ This could mean your host's database server is down.</p>
 
 		$sql = "$type INTO `$table` ($fields) VALUES ($formats)";
 
-		
+
 		$this->check_current_query = false;
 		return $this->query( $this->prepare( $sql, $values ) );
     }
@@ -1344,7 +1358,7 @@ This could mean your host's database server is down.</p>
 		$this->check_current_query = false;
 		return $this->query( $this->prepare( $sql, $values ) );
     }
-    
+
 	/**
 	 * Processes arrays of field/value pairs and field formats.
 	 *
@@ -1436,7 +1450,7 @@ This could mean your host's database server is down.</p>
 				$value['charset'] = false;
 			} else {
 				$value['charset'] = $this->get_col_charset( $table, $field );
-				
+
 				// This isn't ASCII. Don't have strip_invalid_text() re-check.
 				$value['ascii'] = false;
 			}
@@ -1445,7 +1459,7 @@ This could mean your host's database server is down.</p>
 		}
 
 		return $data;
-	}   
+	}
 
     /**
      * Retrieve one variable from the database.
@@ -1463,11 +1477,11 @@ This could mean your host's database server is down.</p>
      */
 	public function get_var( $query = null, $x = 0, $y = 0 ) {
         $this->func_call = "\$db->get_var(\"$query\", $x, $y)";
-		
+
         if ( $query ) {
 			$this->query( $query );
         }
-        
+
         // Extract var out of cached results based x,y vals
 		if ( !empty( $this->last_result[$y] ) ) {
 			$values = array_values( get_object_vars( $this->last_result[$y] ) );
@@ -1497,7 +1511,7 @@ This could mean your host's database server is down.</p>
         } else {
             return null;
         }
-        
+
 		if ( !isset( $this->last_result[$y] ) )
             return null;
 
@@ -1532,7 +1546,7 @@ This could mean your host's database server is down.</p>
 		if ( $query ) {
 			$this->query( $query );
         }
-        
+
         $new_array = array();
         // Extract the column values
 		for ( $i = 0, $j = count( $this->last_result ); $i < $j; $i++ ) {
@@ -1562,7 +1576,7 @@ This could mean your host's database server is down.</p>
         } else {
             return null;
         }
-        
+
         $new_array = array();
 		if ( $output == OBJECT ) {
             // Return an integer-keyed array of row objects
@@ -2024,8 +2038,8 @@ This could mean your host's database server is down.</p>
 		}
 
 		return false;
-	}    
-    
+	}
+
     /**
 	 * Load the column metadata from the last query.
 	 *
@@ -2124,7 +2138,7 @@ This could mean your host's database server is down.</p>
      */
     public function check_database_version() {
 		global $required_mysql_version;
-		
+
 		if (empty($required_mysql_version))
 			return true;
 
@@ -2132,7 +2146,7 @@ This could mean your host's database server is down.</p>
 		if (version_compare($this->db_version(), $required_mysql_version, '<') )
             return trigger_error("database_version: <strong>ERROR</strong>: App %s requires MySQL 4.1.2 or higher ", E_USER_ERROR);
     }
-    
+
     /**
      * The database character collate.
      *
@@ -2156,7 +2170,7 @@ This could mean your host's database server is down.</p>
      *
      * @since 2.7.0
      * @since 4.1.0 Support was added for the 'utf8mb4' feature.
-     * 
+     *
      * @see idb::db_version()
      *
      * @param string $db_cap The feature to check for. Accepts 'collation',
@@ -2221,7 +2235,7 @@ This could mean your host's database server is down.</p>
 
         return join(', ', $caller);
     }
-    
+
     /**
      * Retrieves the MySQL server version.
      *
