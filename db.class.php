@@ -542,6 +542,10 @@ class idb {
      */
     function _real_escape($string) {
         if ( $this->dbh ) {
+            if (is_null($string)) {
+                return $string;
+            }
+
 			if ( $this->use_mysqli ) {
 				return mysqli_real_escape_string( $this->dbh, $string );
 			} else {
@@ -1748,6 +1752,9 @@ This could mean your host's database server is down.</p>
 	 * @return bool True if ASCII, false if not.
 	 */
 	protected function check_ascii( $string ) {
+        if (is_null($string)) {
+            return true;
+        }
 		if ( function_exists( 'mb_check_encoding' ) ) {
 			if ( mb_check_encoding( $string, 'ASCII' ) ) {
 				return true;
