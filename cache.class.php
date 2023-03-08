@@ -14,6 +14,13 @@
  */
 abstract class idb_Cache_Core {
     /**
+     * The DB class
+     *
+     * @access public
+     */
+    var $idb;
+
+    /**
      * Cache expiry
      * Note: this is in seconds
      *

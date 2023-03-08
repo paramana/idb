@@ -64,6 +64,15 @@ class idb {
     var $logger;
 
     /**
+     * Debug
+     *
+     * @since 3.0.0
+     * @access private
+     * @var bool
+     */
+    var $debug = false;
+
+    /**
      * Whether to show SQL/DB errors.
      *
      * Default behavior is to show errors if both DEBUG
@@ -252,6 +261,15 @@ class idb {
     var $collate;
 
     /**
+     * Database Name
+     *
+     * @since 2.9.0
+     * @access private
+     * @var string
+     */
+    var $dbname;
+
+    /**
      * Database Username
      *
      * @since 2.9.0
@@ -259,6 +277,51 @@ class idb {
      * @var string
      */
     var $dbuser;
+
+    /**
+     * Database Password
+     *
+     * @since 2.9.0
+     * @access private
+     * @var string
+     */
+    var $dbpassword;
+
+    /**
+     * Database Host
+     *
+     * @since 2.9.0
+     * @access private
+     * @var string
+     */
+    var $dbhost;
+
+    /**
+     * Database is MySQL
+     *
+     * @since 2.9.0
+     * @access private
+     * @var boolean
+     */
+    var $is_mysql;
+
+    /**
+     * The resource given by mysql_connect
+     *
+     * @since 2.9.0
+     * @access private
+     * @var resource
+     */
+    var $dbh;
+
+    /**
+     * Database disk cache
+     *
+     * @since 3.1.0
+     * @access private
+     * @var Class
+     */
+    var $cache;
 
     /**
      * A textual description of the last query/get_row/get_var call
