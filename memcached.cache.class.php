@@ -75,7 +75,7 @@ class iDB_Cache extends idb_Cache_Core {
     }
 
     private function connect() {
-        if(self::$connected === true)
+        if(self::$connected === true && !empty($this->memcached))
             return true;
 
         if(class_exists('Memcached')) {
