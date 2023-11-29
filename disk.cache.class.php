@@ -44,7 +44,7 @@ class iDB_Cache extends idb_Cache_Core {
      * false if the pipe cannot be established or null if an error occurs or the command produces no output. 
      */
     public function flush() {
-        return shell_exec("rm " . DB_CACHE_DIR . "/*");
+        return shell_exec("rm " . DB_CACHE_DIR . "/* > /dev/null 2>&1 &");
     }
 
     /**
