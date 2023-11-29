@@ -2,9 +2,9 @@
 /**
  * iDB Disk Cache Class
  *
- * Version: 1.11
+ * Version: 1.12
  * Started: 05-01-2015
- * Updated: 13-02-2019
+ * Updated: 29-11-2023
  *
  */
 
@@ -103,6 +103,16 @@ abstract class idb_Cache_Core {
      *
      */
     protected function init() {
+
+    }
+
+    /**
+     * Clears cache
+     * Can be overidden from the child class
+     * 
+     * @since 1.12
+     */
+    function flush() {
 
     }
 

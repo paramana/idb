@@ -2,9 +2,9 @@
 /**
  * iDB Memcached Cache Class
  *
- * Version: 1.0
+ * Version: 1.12
  * Started: 19-03-2015
- * Updated: 30-01-2018
+ * Updated: 29-11-2023
  *
  */
 
@@ -38,6 +38,20 @@ class iDB_Cache extends idb_Cache_Core {
             $this->compress = DB_MEMCACHED_COMPRESS;
         if (defined('DB_MEMCACHED_DEFAULT_EXPIRY'))
             $this->expiry = DB_MEMCACHED_DEFAULT_EXPIRY;
+    }
+
+    /**
+     * Clears all Memcached
+     *
+     * @since 1.12
+     * @return true on success or false on failure. 
+     */
+    public function flush() {
+        if(!$this->connect()) {
+            return false;
+        }
+
+        return $this->memcached->flush();
     }
 
     public function delete($key, $timeout = 0) {

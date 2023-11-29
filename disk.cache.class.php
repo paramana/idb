@@ -2,9 +2,9 @@
 /**
  * iDB Disk Cache Class
  *
- * Version: 1.2
+ * Version: 1.12
  * Started: 05-01-2015
- * Updated: 04-06-2020
+ * Updated: 29-11-2023
  *
  */
 
@@ -34,6 +34,17 @@ class iDB_Cache extends idb_Cache_Core {
     protected function init(){
         if (defined('DB_CACHE_DIR'))
             $this->cache_dir = DB_CACHE_DIR;
+    }
+
+    /**
+     * Clears all Disk Cache
+     *
+     * @since 1.12
+     * @return string A string containing the output from the executed command, 
+     * false if the pipe cannot be established or null if an error occurs or the command produces no output. 
+     */
+    public function flush() {
+        return shell_exec("rm " . DB_CACHE_DIR . "/*");
     }
 
     /**

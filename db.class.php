@@ -3,10 +3,10 @@
 /**
  * iDB Class
  *
- * Version: 1.1
+ * Version: 1.12
  * Started: 02-02-2010
  * Updated From WP: 12-04-2016
- * Updated: 18-05-2022
+ * Updated: 29-11-2023
  *
  * Original code from {@link http://php.justinvincent.com Justin Vincent (justin@visunet.ie)}
  * and from wordpress {@link http://wordpress.org/}
@@ -315,7 +315,7 @@ class idb {
     var $dbh;
 
     /**
-     * Database disk cache
+     * Database cache
      *
      * @since 3.1.0
      * @access private
@@ -486,6 +486,19 @@ class idb {
 
             $this->cache = new iDB_Cache($this);
         }
+    }
+
+    /**
+     * Clears the cache
+     *
+     * @since 1.12
+     */
+    public function clear_cache() {
+        if (empty($this->cache)) {
+            return false;
+        }
+
+        return $this->cache->flush();
     }
 
     /**
@@ -1101,7 +1114,7 @@ This could mean your host's database server is down.</p>
         // Keep track of the last query for debug..
         $this->last_query = $query;
 
-        // Use core file cache function
+        // Use core cache function
         if ($this->use_cache && !empty($this->cache) && ($cache = $this->cache->get_cache($query))) {
             // Count how many queries there have been
             $this->num_queries++;
@@ -1185,7 +1198,7 @@ This could mean your host's database server is down.</p>
 			$return_val     = $num_rows;
         }
 
-        // disk caching of queries
+        // caching of queries
         if ($this->use_cache && !empty($this->cache))
             $this->cache->store_cache($query, $is_insert);
 
