@@ -4,7 +4,7 @@
  *
  * Version: 1.12
  * Started: 05-01-2015
- * Updated: 29-11-2023
+ * Updated: 26-12-2023
  *
  */
 
@@ -40,8 +40,8 @@ class iDB_Cache extends idb_Cache_Core {
      * Clears all Disk Cache
      *
      * @since 1.12
-     * @return string A string containing the output from the executed command, 
-     * false if the pipe cannot be established or null if an error occurs or the command produces no output. 
+     * @return string A string containing the output from the executed command,
+     * false if the pipe cannot be established or null if an error occurs or the command produces no output.
      */
     public function flush() {
         return shell_exec("rm " . DB_CACHE_DIR . "/* > /dev/null 2>&1 &");
@@ -102,7 +102,10 @@ class iDB_Cache extends idb_Cache_Core {
             $cache_content = unserialize(gzinflate(file_get_contents($cache_file)));
 
             if (!empty($cache_content["expire_at"]) && time() > $cache_content["expire_at"] || !$cache_content) {
-                unlink($cache_file);
+                if (file_exists($cache_file)) {
+                    unlink($cache_file);
+                }
+
                 return null;
             }
             else {
