@@ -5,7 +5,7 @@
  * Version: 1.2
  * Started: 02-02-2010
  * Updated From WP: 12-04-2016
- * Updated: 21-09-2024
+ * Updated: 09-10-2024
  *
  * Original code from {@link http://php.justinvincent.com Justin Vincent (justin@visunet.ie)}
  * and from wordpress {@link http://wordpress.org/}
@@ -1698,14 +1698,15 @@ This could mean your host's database server is down.</p>
 
         $is_insert = false;
 		if ( preg_match( '/^\s*(create|alter|truncate|drop)\s/i', $query ) ) {
+            $is_insert = true;
             $return_val = $this->result;
 		} elseif ( preg_match( '/^\s*(insert|delete|update|replace)\s/i', $query ) ) {
-				$this->rows_affected = mysqli_affected_rows( $this->dbh );
+            $is_insert = true;
+            $this->rows_affected = mysqli_affected_rows( $this->dbh );
 
 			// Take note of the insert_id.
 			if ( preg_match( '/^\s*(insert|replace)\s/i', $query ) ) {
 					$this->insert_id = mysqli_insert_id( $this->dbh );
-                $is_insert = true;
             }
 
 			// Return number of rows affected.
