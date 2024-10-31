@@ -5,7 +5,7 @@
  * Version: 1.2
  * Started: 02-02-2010
  * Updated From WP: 12-04-2016
- * Updated: 09-10-2024
+ * Updated: 31-10-2024
  *
  * Original code from {@link http://php.justinvincent.com Justin Vincent (justin@visunet.ie)}
  * and from wordpress {@link http://wordpress.org/}
@@ -1615,6 +1615,8 @@ This could mean your host's database server is down.</p>
 			$this->check_current_query = true;
 			return false;
 		}
+
+		$query = $this->remove_placeholder_escape($query);
 
 		if ( ! $query ) {
 			$this->insert_id = 0;
