@@ -26,7 +26,7 @@ class iDB_Cache extends idb_Cache_Core {
     private $expiry   = 3600;
 
     /**
-     * Behaves as a contructor
+     * Behaves as a constructor
      * And overwrites the init of the idb_Cache_Core class
      */
     protected function init(){
