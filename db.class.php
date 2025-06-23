@@ -1209,8 +1209,9 @@ class idb {
 				if ( ! is_scalar( $value ) && ! is_null( $value ) ) {
 					trigger_error(
 						sprintf(
-							'Unsupported value type (%s).',
-							gettype( $value )
+							'Unsupported value type (%s). Query: %s',
+							gettype( $value ),
+                            $query
 						),
 						E_USER_WARNING
 					);
