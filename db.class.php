@@ -1,11 +1,12 @@
 <?php
+
 /**
  * iDB Class
  *
  * Version: 1.2
  * Started: 02-02-2010
- * Updated From WP: 12-04-2016
- * Updated: 31-10-2024
+ * Updated From WP: 11-08-2025
+ * Updated: 30-10-2025
  *
  * Original code from {@link http://php.justinvincent.com Justin Vincent (justin@visunet.ie)}
  * and from wordpress {@link http://wordpress.org/}
@@ -15,9 +16,9 @@
  *
  * with some added file caching functionality
  *
- * from wp commit 78d729602e11dd251b434124969be8c6d6922c8f on 04/04/2024
+ * from wp commit 23c1de7d05bf4d2ff5e826bac24811a478f87f9c on 11/08/2025
  *
- * @source https://github.com/giannis/idb
+ * @source https://github.com/paramana/idb
  *
  */
 
@@ -493,7 +494,13 @@ class idb {
 	 * @param string $dbname     Database name.
 	 * @param string $dbhost     Database host.
 	 */
-	public function __construct( $dbuser, $dbpassword, $dbname, $dbhost ) {
+	public function __construct(
+		$dbuser,
+		#[\SensitiveParameter]
+		$dbpassword,
+		$dbname,
+		$dbhost
+	 ) {
         if (DEBUG) {
             $this->show_errors();
         }
@@ -672,10 +679,10 @@ class idb {
 		}
 	}
 
-    /**
+	/**
 	 * Changes the current SQL mode, and ensures its compatibility.
 	 *
-	 * If no modes are passed, it will ensure the current MySQL server modes are compatible.
+	 * If no modes are passed, it will ensure the current SQL server modes are compatible.
 	 *
 	 * @since 3.9.0
 	 *
@@ -862,7 +869,7 @@ class idb {
 	}
 
 	/**
-	 * Quotes an identifier for a MySQL database, e.g. table/field names.
+	 * Quotes an identifier such as a table or field name.
 	 *
 	 * @since 6.2.0
 	 *
@@ -891,7 +898,7 @@ class idb {
 		return str_replace( '`', '``', $identifier );
 	}
 
-    /**
+	/**
 	 * Prepares a SQL query for safe execution.
 	 *
 	 * Uses `sprintf()`-like syntax. The following placeholders can be used in the query string:
@@ -926,6 +933,13 @@ class idb {
 	 *     $idb->prepare(
 	 *         "SELECT DATE_FORMAT(`field`, '%%c') FROM `table` WHERE `column` = %s",
 	 *         'foo'
+	 *     );
+	 *
+	 *     $wpdb->prepare(
+	 *         "SELECT * FROM %i WHERE %i = %s",
+	 *         $table,
+	 *         $field,
+	 *         $value
 	 *     );
 	 *
 	 * @since 2.3.0
@@ -1406,7 +1420,7 @@ class idb {
 		$client_flags = defined( 'MYSQL_CLIENT_FLAGS' ) ? MYSQL_CLIENT_FLAGS : 0;
 
 		/*
-		 * Set the MySQLi error reporting off because handles its own.
+		 * Switch error reporting off because handles its own.
 		 * This is due to the default value change from `MYSQLI_REPORT_OFF`
 		 * to `MYSQLI_REPORT_ERROR|MYSQLI_REPORT_STRICT` in PHP 8.1.
 		 */
@@ -1530,7 +1544,7 @@ This could mean your host's database server is down.</p>
 		}
 
 		$host = ! empty( $matches['host'] ) ? $matches['host'] : '';
-		// MySQLi port cannot be a string; must be null or an integer.
+		// Port cannot be a string; must be null or an integer.
 		$port = ! empty( $matches['port'] ) ? abs( (int) $matches['port'] ) : null;
 
 		return array( $host, $port, $socket, $is_ipv6 );
@@ -1550,7 +1564,7 @@ This could mean your host's database server is down.</p>
 	 * @return bool|void True if the connection is up.
 	 */
 	public function check_connection( $allow_bail = true ) {
-		if ( ! empty( $this->dbh ) && mysqli_ping( $this->dbh ) ) {
+		if (! empty($this->dbh) && mysqli_query($this->dbh, 'DO 1') !== false) {
 			return true;
 		}
 
@@ -1686,7 +1700,7 @@ This could mean your host's database server is down.</p>
 		if ( $this->dbh instanceof mysqli ) {
 			$this->last_error = mysqli_error( $this->dbh );
 		} else {
-			$this->last_error = 'Unable to retrieve the error message from MySQL';
+			$this->last_error = 'Unable to retrieve the error message from the database server';
 		}
 
 		if ( $this->last_error ) {
@@ -1800,11 +1814,9 @@ This could mean your host's database server is down.</p>
 		static $placeholder;
 
 		if ( ! $placeholder ) {
-			// If ext/hash is not present, compat.php's hash_hmac() does not support sha256.
-			$algo = function_exists( 'hash' ) ? 'sha256' : 'sha1';
 			$salt = defined( 'AUTH_SALT' ) && AUTH_SALT ? AUTH_SALT : (string) rand();
 
-			$placeholder = '{' . hash_hmac( $algo, uniqid( $salt, true ), $salt ) . '}';
+			$placeholder = '{' . hash_hmac('sha256', uniqid($salt, true), $salt) . '}';
 		}
 
 		return $placeholder;
@@ -2240,8 +2252,12 @@ This could mean your host's database server is down.</p>
 	 * @return array {
 	 *     Array of values and formats keyed by their field names.
 	 *
-	 *     @type mixed  $value  The value to be formatted.
-	 *     @type string $format The format to be mapped to the value.
+	 *     @type array ...$0 {
+	 *         Value and format for this field.
+	 *
+	 *         @type mixed  $value  The value to be formatted.
+	 *         @type string $format The format to be mapped to the value.
+	 *     }
 	 * }
 	 */
 	protected function process_field_formats( $data, $format ) {
@@ -2817,8 +2833,8 @@ This could mean your host's database server is down.</p>
 		return false;
 	}
 
-    /**
-	 * Checks if the query is accessing a collation considered safe on the current version of MySQL.
+	/**
+	 * Checks if the query is accessing a collation considered safe.
 	 *
 	 * @since 4.2.0
 	 * @access protected
@@ -3149,6 +3165,9 @@ This could mean your host's database server is down.</p>
 		// Strip everything between parentheses except nested selects.
 		$query = preg_replace( '/\((?!\s*select)[^(]*?\)/is', '()', $query );
 
+		// Strip any leading SET STATEMENT statements.
+		$query = preg_replace('/^SET STATEMENT.+?\sFOR\s+/is', '', $query);
+
 		// Quickly match most common queries.
 		if ( preg_match(
 			'/^\s*(?:'
@@ -3334,14 +3353,14 @@ This could mean your host's database server is down.</p>
 		return $closed;
 	}
 
-    /**
-	 * Determines whether MySQL database is at least the required minimum version.
-     *
-     * @since 2.5.0
-     *
-     * @global string $required_mysql_version The required MySQL version string.
-     * @return error
-     */
+	/**
+	 * Determines whether the database server is at least the required minimum version.
+	 *
+	 * @since 2.5.0
+	 *
+	 * @global string $required_mysql_version The minimum required MySQL version string.
+	 * @return error
+	 */
     public function check_database_version() {
 		global $required_mysql_version;
 
@@ -3378,7 +3397,7 @@ This could mean your host's database server is down.</p>
 	 *
 	 * Capability sniffs for the database server and current version of iDB.
 	 *
-	 * Database sniffs are based on the version of MySQL the site is using.
+	 * Database sniffs are based on the version of the database server in use.
 	 *
 	 * iDB sniffs are added as new features are introduced to allow theme and plugin
 	 * developers to determine feature support. This is to account for drop-ins which may
@@ -3458,7 +3477,7 @@ This could mean your host's database server is down.</p>
     }
 
 	/**
-	 * Retrieves the database server version.
+	 * Retrieves the database server version number.
 	 *
 	 * @since 2.7.0
 	 *
@@ -3469,11 +3488,11 @@ This could mean your host's database server is down.</p>
 	}
 
 	/**
-	 * Returns the version of the MySQL server.
+	 * Returns the raw version string of the database server.
 	 *
 	 * @since 5.5.0
 	 *
-	 * @return string Server version as a string.
+	 * @return string Database server version as a string.
 	 */
 	public function db_server_info() {
 		return mysqli_get_server_info( $this->dbh );
