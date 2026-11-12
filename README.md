@@ -97,4 +97,4 @@ $db->clear_cache();
 
 ## License
 
-[LGPL-3.0](LICENSE)
+[GPL-2.0-or-later](LICENSE)
