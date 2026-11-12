@@ -5,18 +5,18 @@
  *
  * Version: 1.2
  * Started: 02-02-2010
- * Updated From WP: 11-08-2025
- * Updated: 30-10-2025
+ * Updated From WP: 28-10-2026
+ * Updated: 08-11-2026
  *
  * Original code from {@link http://php.justinvincent.com Justin Vincent (justin@visunet.ie)}
  * and from wordpress {@link http://wordpress.org/}
  *
  * This is a clone of the wp db class
- * https://github.com/WordPress/WordPress/blob/master/wp-includes/wp-db.php
+ * https://github.com/WordPress/WordPress/blob/master/wp-includes/class-wpdb.php
  *
  * with some added file caching functionality
  *
- * from wp commit 23c1de7d05bf4d2ff5e826bac24811a478f87f9c on 11/08/2025
+ * from wp commit ef3aba065a50f7cfefe4783ecbb7be2c596c3a80 on 28/10/2026
  *
  * @source https://github.com/paramana/idb
  *
@@ -202,9 +202,15 @@ class idb {
 	/**
 	 * Saved info on the table column.
 	 *
+	 * Each value is populated by mysqli_fetch_field() in {@see idb::load_col_info()}, which is
+	 * typed as returning false when there are no more fields. A false value cannot actually occur,
+	 * however, since the loop only runs for the number of fields returned by mysqli_num_fields().
+	 * Populating the array with mysqli_fetch_fields() instead would allow this type to be narrowed
+	 * to a list of stdClass objects.
+	 *
 	 * @since 0.71
 	 *
-     * @var array
+	 * @var array<int, stdClass|false>|null
      */
 	protected $col_info;
 
@@ -371,6 +377,7 @@ class idb {
 		'STRICT_ALL_TABLES',
 		'TRADITIONAL',
 		'ANSI',
+		'NO_BACKSLASH_ESCAPES',
 	);
 
 	/**
@@ -568,7 +575,7 @@ class idb {
 	 *
 	 * @since 3.5.0
 	 *
-	 * @param string $name  The private member to unset
+	 * @param string $name The private member to unset.
 	 */
 	public function __unset( $name ) {
 		unset( $this->$name );
@@ -702,28 +709,13 @@ class idb {
 				return;
 			}
 
-			$modes_str = $modes_array[0];
-
-			if ( empty( $modes_str ) ) {
-				return;
-			}
-
-			$modes = explode( ',', $modes_str );
+			$modes = explode( ',', $modes_array[0] );
 		}
 
-		$modes = array_change_key_case( $modes, CASE_UPPER );
-
-		/**
-		 * Filters the list of incompatible SQL modes to exclude.
-		 *
-		 * @since 3.9.0
-		 *
-		 * @param array $incompatible_modes An array of incompatible modes.
-		 */
-		$incompatible_modes = (array) apply_filters( 'incompatible_sql_modes', $this->incompatible_modes );
+		$modes = array_map( 'strtoupper', $modes );
 
 		foreach ( $modes as $i => $mode ) {
-			if ( in_array( $mode, $incompatible_modes, true ) ) {
+			if ( in_array( $mode, $this->incompatible_modes, true ) ) {
 				unset( $modes[ $i ] );
 			}
 		}
@@ -960,11 +952,11 @@ class idb {
 	 *                             individual arguments.
 	 * @param mixed       ...$args Further variables to substitute into the query's placeholders
 	 *                             if being called with individual arguments.
-	 * @return string|void Sanitized query string, if there is a query to prepare.
+	 * @return string|null Sanitized query string, if there is a query to prepare.
 	 */
 	public function prepare( $query, ...$args ) {
 		if ( is_null( $query ) ) {
-			return;
+			return null;
 		}
 
 		/*
@@ -1172,7 +1164,7 @@ class idb {
 					E_USER_WARNING
 				);
 
-				return;
+				return null;
 			} else {
 				/*
 				 * If we don't have the right number of placeholders,
@@ -1260,7 +1252,6 @@ class idb {
 	 *     $sql  = esc_sql( $idb->esc_like( $input ) );
 	 *
 	 * @since 4.0.0
-	 * @access public
 	 *
 	 * @param string $text The raw text to be escaped. The input typed by the user
 	 *                     should have no extra or deleted slashes.
@@ -1377,7 +1368,6 @@ class idb {
 	 * Kills cached query results.
      *
      * @since 0.71
-     * @return void
      */
     public function flush() {
 		$this->last_result   = array();
@@ -1561,10 +1551,11 @@ This could mean your host's database server is down.</p>
 	 * @since 3.9.0
 	 *
 	 * @param bool $allow_bail Optional. Allows the function to bail. Default true.
-	 * @return bool|void True if the connection is up.
+	 * @return bool Whether the connection is up. Exits if down and $allow_bail is true.
 	 */
 	public function check_connection( $allow_bail = true ) {
-		if (! empty($this->dbh) && mysqli_query($this->dbh, 'DO 1') !== false) {
+		// Check if the connection is alive.
+		if ( ! empty( $this->dbh ) && mysqli_query( $this->dbh, 'DO 1' ) !== false ) {
 			return true;
 		}
 
@@ -2188,7 +2179,6 @@ This could mean your host's database server is down.</p>
 	 * then field processing is rejected and the query fails.
 	 *
 	 * @since 4.2.0
-	 * @access protected
 	 *
 	 * @param string          $table  Table name.
 	 * @param array           $data   Array of values keyed by their field names.
@@ -2245,7 +2235,6 @@ This could mean your host's database server is down.</p>
 	 * Prepares arrays of value/format pairs as passed to idb CRUD methods.
 	 *
 	 * @since 4.2.0
-	 * @access protected
 	 *
 	 * @param array           $data   Array of values keyed by their field names.
 	 * @param string[]|string $format Formats or format to be mapped to the values in the data.
@@ -2289,7 +2278,6 @@ This could mean your host's database server is down.</p>
 	 * Adds field charsets to field/value/format arrays generated by idb::process_field_formats().
 	 *
 	 * @since 4.2.0
-	 * @access protected
 	 *
 	 * @param array $data {
 	 *     Array of values and formats keyed by their field names,
@@ -2317,7 +2305,6 @@ This could mean your host's database server is down.</p>
 	 * }
 	 */
 	protected function process_field_charsets( $data, $table ) {
-
 		foreach ( $data as $field => $value ) {
 			if ( '%d' === $value['format'] || '%f' === $value['format'] ) {
 				/*
@@ -2328,9 +2315,8 @@ This could mean your host's database server is down.</p>
 			} else {
 				$value['charset'] = $this->get_col_charset( $table, $field );
 				if ( $value['charset'] == 'error' ) {
-				// if ( is_wp_error( $value['charset'] ) ) {
 					return false;
-			    }
+				}
 			}
 
 			$data[ $field ] = $value;
@@ -2388,7 +2374,6 @@ This could mean your host's database server is down.</p>
 			} else {
 				$value['length'] = $this->get_col_length( $table, $field );
 				if ( $value['length'] == 'error' ) {
-				// if ( is_wp_error( $value['length'] ) ) {
 					return false;
 				}
 			}
@@ -2412,7 +2397,8 @@ This could mean your host's database server is down.</p>
      * @param string|null $query Optional. SQL query. Defaults to null, use the result from the previous query.
 	 * @param int         $x     Optional. Column of value to return. Indexed from 0. Default 0.
 	 * @param int         $y     Optional. Row of value to return. Indexed from 0. Default 0.
-	 * @return string|null Database query result (as string), or null on failure.
+	 * @return string|null Database query result (as string), or null on failure or when the value is an empty string.
+	 * @phpstan-return non-empty-string|null
      */
 	public function get_var( $query = null, $x = 0, $y = 0 ) {
         $this->func_call = "\$db->get_var(\"$query\", $x, $y)";
@@ -2427,6 +2413,14 @@ This could mean your host's database server is down.</p>
 
 		// Extract var out of cached results based on x,y vals.
 		if ( ! empty( $this->last_result[ $y ] ) ) {
+			/**
+			 * Column values.
+			 *
+			 * These are returned from the database as strings, or null for SQL NULL, but get_object_vars() types the
+			 * property values as mixed.
+			 *
+			 * @var list<string|null> $values
+			 */
 			$values = array_values( get_object_vars( $this->last_result[ $y ] ) );
         }
 
@@ -2477,6 +2471,7 @@ This could mean your host's database server is down.</p>
 		} else {
 			$this->print_error( ' $db->get_row(string query, output type, int offset) -- Output type must be one of: OBJECT, ARRAY_A, ARRAY_N' );
         }
+		return null;
     }
 
     /**
@@ -2491,6 +2486,7 @@ This could mean your host's database server is down.</p>
      * @param string|null $query Optional. SQL query. Defaults to previous query.
 	 * @param int         $x     Optional. Column to return. Indexed from 0. Default 0.
      * @return array Database query result. Array indexed from 0 by SQL result row number.
+	 * @phpstan-return list<non-empty-string|null>
      */
 	public function get_col( $query = null, $x = 0 ) {
 		if ( $query ) {
@@ -2505,7 +2501,7 @@ This could mean your host's database server is down.</p>
 		// Extract the column values.
 		if ( $this->last_result ) {
 		for ( $i = 0, $j = count( $this->last_result ); $i < $j; $i++ ) {
-				$new_array[ $i ] = $this->get_var( null, $x, $i );
+				$new_array[] = $this->get_var( null, $x, $i );
         }
 		}
         return $new_array;
@@ -2554,7 +2550,15 @@ This could mean your host's database server is down.</p>
 			if ( $this->last_result ) {
 			foreach ( $this->last_result as $row ) {
 				$var_by_ref = get_object_vars( $row );
-					$key        = array_shift( $var_by_ref );
+					/**
+					 * The first column's value is used as the key.
+					 *
+					 * A SQL NULL value surfaces as null here, so coerce it to an empty string to avoid the deprecated
+					 * use of null as an array offset (PHP 8.5+).
+					 *
+					 * @var array-key $key
+					 */
+					$key = array_shift( $var_by_ref ) ?? '';
 					if ( ! isset( $new_array[ $key ] ) ) {
 					$new_array[ $key ] = $row;
             }
@@ -2588,7 +2592,6 @@ This could mean your host's database server is down.</p>
 	 * Retrieves the character set for the given table.
 	 *
 	 * @since 4.2.0
-	 * @access protected
 	 *
 	 * @param string $table Table name.
 	 * @return string|FALSE Table character set,
@@ -2608,7 +2611,6 @@ This could mean your host's database server is down.</p>
 		$results     = $this->get_results( "SHOW FULL COLUMNS FROM $table" );
 		if ( ! $results ) {
 			return 'error';
-			// return false;//wp_error
 		}
 
 		foreach ( $results as $column ) {
@@ -2670,7 +2672,6 @@ This could mean your host's database server is down.</p>
 	 * Retrieves the character set for the given column.
 	 *
 	 * @since 4.2.0
-	 * @access public
 	 *
 	 * @param string $table  Table name.
 	 * @param string $column Column name.
@@ -2690,7 +2691,6 @@ This could mean your host's database server is down.</p>
 			// This primes column information for us.
 			$table_charset = $this->get_table_charset( $table );
 			if ( $table_charset == 'error' ) {
-			// if ( might_keep_is_wp_error( $table_charset ) ) {
 				return $table_charset;
 			}
 		}
@@ -2744,7 +2744,6 @@ This could mean your host's database server is down.</p>
 			// This primes column information for us.
 			$table_charset = $this->get_table_charset( $table );
 			if ( $table_charset == 'error' ) {
-			// if ( might_keep_is_wp_error( $table_charset ) ) {
 				return $table_charset;
 			}
 		}
@@ -2837,7 +2836,6 @@ This could mean your host's database server is down.</p>
 	 * Checks if the query is accessing a collation considered safe.
 	 *
 	 * @since 4.2.0
-	 * @access protected
 	 *
 	 * @param string $query The query to check.
 	 * @return bool True if the collation is safe, false if it isn't.
@@ -2904,7 +2902,6 @@ This could mean your host's database server is down.</p>
 	 * Strips any invalid characters based on value/charset pairs.
 	 *
 	 * @since 4.2.0
-	 * @access protected
 	 *
 	 * @param array $data Array of value arrays. Each value array has the keys 'value', 'charset', and 'length'.
 	 *                    An optional 'ascii' key can be set to false to avoid redundant ASCII checks.
@@ -3097,7 +3094,6 @@ This could mean your host's database server is down.</p>
 
 		$data = $this->strip_invalid_text( array( $data ) );
 		if ( $data == 'error' ) {
-		// if ( might_keep_2_is_wp_error( $data ) ) {
 			return $data;
 		}
 
@@ -3108,7 +3104,6 @@ This could mean your host's database server is down.</p>
 	 * Strips any invalid characters from the string for a given table and column.
 	 *
 	 * @since 4.2.0
-	 * @access public
 	 *
 	 * @param string $table  Table name.
 	 * @param string $column Column name.
@@ -3125,7 +3120,6 @@ This could mean your host's database server is down.</p>
 			// Not a string column.
 			return $value;
 		} elseif ( $charset == 'error' ) {
-		// } elseif ( is_wp_error( $charset ) ) {
 			// Bail on real errors.
 			return $charset;
 		}
@@ -3140,7 +3134,6 @@ This could mean your host's database server is down.</p>
 
 		$data = $this->strip_invalid_text( $data );
 		if ( $data == 'error' ) {
-		// if ( might_keep_2_is_wp_error( $data ) ) {
 			return $data;
 		}
 
@@ -3166,7 +3159,7 @@ This could mean your host's database server is down.</p>
 		$query = preg_replace( '/\((?!\s*select)[^(]*?\)/is', '()', $query );
 
 		// Strip any leading SET STATEMENT statements.
-		$query = preg_replace('/^SET STATEMENT.+?\sFOR\s+/is', '', $query);
+		$query = preg_replace( '/^SET STATEMENT.+?\sFOR\s+/is', '', $query );
 
 		// Quickly match most common queries.
 		if ( preg_match(
@@ -3231,7 +3224,7 @@ This could mean your host's database server is down.</p>
 	 * @since 3.5.0
 	 */
 	protected function load_col_info() {
-		if ( $this->col_info ) {
+		if ( $this->col_info || ! $this->result instanceof mysqli_result ) {
 			return;
 		}
 
@@ -3270,6 +3263,8 @@ This could mean your host's database server is down.</p>
 				return $this->col_info[ $col_offset ]->{$info_type};
 			}
 		}
+
+		return null;
 	}
 
 	/**
@@ -3424,7 +3419,8 @@ This could mean your host's database server is down.</p>
 		 * Account for MariaDB version being prefixed with '5.5.5-' on older PHP versions.
 		 */
 		if ( '5.5.5' === $db_version && false !== strpos( $db_server_info, 'MariaDB' )
-			&& PHP_VERSION_ID < 80016 // PHP 8.0.15 or older.
+			&& ( PHP_VERSION_ID <= 80015 // PHP 8.0.15 or older.
+				|| 80100 <= PHP_VERSION_ID && PHP_VERSION_ID <= 80102 ) // PHP 8.1.0 to PHP 8.1.2.
 		) {
 			// Strip the '5.5.5-' prefix and set the version to the correct value.
 			$db_server_info = preg_replace( '/^5\.5\.5-(.*)/', '$1', $db_server_info );
